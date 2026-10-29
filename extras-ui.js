@@ -174,7 +174,7 @@
       ctx.beginPath(); ctx.arc(0, 0, 9, 0, Math.PI * 2); ctx.fillStyle = '#c6e994'; ctx.fill();
       ctx.strokeStyle = '#10180c'; ctx.lineWidth = 2.2; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.beginPath(); ctx.moveTo(-4, 0); ctx.lineTo(-1, 3); ctx.lineTo(4.5, -3.5); ctx.stroke(); ctx.restore();
       text('In je lade', bx + 26, by + 30, 11.5, '#c6e994', 700);
-      if (!incoming.chimed) { incoming.chimed = true; tone(880, 1320, 0.09, 0.016); }
+      if (!incoming.chimed) { incoming.chimed = true; window.__winlandSfx?.ui('drop'); }
     } else text(names.length > 1 ? `${names.length} bestanden…` : 'Bezig…', bx, by + 30, 11, '#8f998d', 600);
     ctx.restore();
   }

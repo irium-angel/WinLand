@@ -13,7 +13,7 @@
   // ---------- preferences (Settings → Algemeen) ----------
   const DEFAULTS = { lang: 'fr', theme: 'dark', profile: 'custom', quietFullscreen: true, autoHide: true, privacyDot: true, shotsToTray: true, downloadsLive: true, chargeLive: true, breakEvery: 0, clipWarn: false, devWatch: false, speed: 'snel', focusMin: 25, focusSec: 1500,eye: 'mint', body: 'wolk', palette: 'klassiek', faces: true, blink: true,
     dance: true, confetti: true, chimes: true, notify: true, startup: true, sleepMin: 10, warnAt: 80,
-    pack: 'klassiek', volumeHud: true, batteryWarn: true, appAnim: true,
+    pack: 'verre', volumeHud: true, batteryWarn: true, appAnim: true,
     testMode: false, name: 'Pip', lightBusy: '#ff9a1f', lightDone: '#22e05a', lightError: '#ff3b3b' };
   const savedPrefs = store.get('winland:prefs', {});
   if (!savedPrefs.newLook) { savedPrefs.body = 'wolk'; savedPrefs.newLook = true; store.set('winland:prefs', savedPrefs); } // switch once to the new white look
@@ -23,6 +23,7 @@
     const old = { zacht: ['#ffc27a', '#8ef0a8', '#ff8a8a'], kleurenblind: ['#ffb000', '#3d9bff', '#ff5ac8'] }[savedPrefs.palette];
     if (old) [prefs.lightBusy, prefs.lightDone, prefs.lightError] = old;
   }
+  if (!window.__winlandSfx?.packs[prefs.pack]) prefs.pack = 'verre'; // the sound packs were renewed (sfx-ui.js)
   if (prefs.lang !== 'en') prefs.lang = 'fr'; // only French and English (old saves may still say 'nl')
   if (prefs.theme !== 'light') prefs.theme = 'dark';
   if (prefs.name === 'Robo' || prefs.name === 'WinLand') prefs.name = 'Pip'; // the old names become the new mascot's
@@ -145,39 +146,11 @@
   window.__winlandPrefs = () => prefs;
   window.__winlandSay = say;
 
-  // ---------- sounds: the same melodies in different sound packs ----------
-  const PACKS = { klassiek: { wave: 'sine', vol: 1, mul: 1, len: 1, label: 'Klassiek' }, '8bit': { wave: 'square', vol: 0.45, mul: 1, len: 0.8, label: '8-bit' },
-    zacht: { wave: 'sine', vol: 0.55, mul: 0.75, len: 1.4, label: 'Zacht' }, belletjes: { wave: 'triangle', vol: 0.9, mul: 2, len: 1.8, label: 'Belletjes' } };
-  let audio = null;
-  function synth(from, to, dur, vol, delay = 0) {
-    const pack = PACKS[prefs.pack] || PACKS.klassiek;
-    try {
-      audio ||= new AudioContext();
-      const t = audio.currentTime + delay, osc = audio.createOscillator(), gain = audio.createGain();
-      osc.type = pack.wave; osc.frequency.setValueAtTime(from * pack.mul, t); osc.frequency.exponentialRampToValueAtTime(to * pack.mul, t + dur * pack.len);
-      gain.gain.setValueAtTime(0.0001, t); gain.gain.exponentialRampToValueAtTime(vol * pack.vol, t + 0.012);
-      gain.gain.exponentialRampToValueAtTime(0.0001, t + dur * pack.len);
-      osc.connect(gain).connect(audio.destination); osc.start(t); osc.stop(t + dur * pack.len + 0.05);
-    } catch {}
-  }
-  const MELODIES = {
-    done: [[660, 880, 0.12, 0.02], [880, 1320, 0.18, 0.018, 0.12]],
-    question: [[520, 600, 0.09, 0.018], [600, 820, 0.14, 0.016, 0.1]],
-    error: [[300, 220, 0.18, 0.022], [220, 160, 0.22, 0.02, 0.16]],
-    party: [523, 659, 784, 1047].map((f, i) => [f, f * 1.01, 0.12, 0.016, i * 0.09]),
-    warn: [[440, 440, 0.1, 0.02], [440, 440, 0.1, 0.02, 0.18]],
-    hello: [392, 523, 659, 784].map((f, i) => [f, f * 1.02, 0.1, 0.014, i * 0.07]),
-    pop: [[700, 1100, 0.06, 0.012]],
-    badge: [784, 988, 1175, 1568].map((f, i) => [f, f * 1.01, 0.1, 0.014, i * 0.06]),
-    yum: [[500, 760, 0.08, 0.016], [760, 620, 0.08, 0.014, 0.09]],
-    // Pip's chat: a soft whoosh when you send, two bright notes for an answer, a little fanfare for a fix
-    send: [[480, 960, 0.07, 0.011]],
-    reply: [[880, 1175, 0.08, 0.012], [1175, 1568, 0.12, 0.01, 0.08]],
-    fix: [523, 659, 784, 1047, 1319].map((f, i) => [f, f * 1.01, 0.13, 0.015, i * 0.075])
-  };
+  // ---------- sounds: the melodies and packs live in sfx-ui.js ----------
+  const PACKS = window.__winlandSfx?.packs || {};
   function chime(kind) {
     if (!soundEnabled || !prefs.chimes || quiet) return;
-    for (const note of MELODIES[kind] || []) synth(...note);
+    window.__winlandSfx?.melody(kind, prefs.pack);
   }
 
   // ---------- finished tasks: only counted (the Claude screen shows today's jobs). No outfits, achievements or hunger. ----------
@@ -288,38 +261,8 @@
   // A spring: overshoots and wobbles out (amp × fading sine). Used for the jelly island and squash & stretch.
   const spring = (ms, amp, hz = 3, damp = 6) => ms < 0 ? 0 : amp * Math.exp(-damp * ms / 1000) * Math.sin(2 * Math.PI * hz * ms / 1000);
 
-  // ---- Pip's voice: soft, round chirps (like a Tamagotchi or Kirby), no words ----
-  const soundVolume = () => { const v = window.__winlandVolume?.() ?? 1; return soundEnabled && v > 0 ? v : 0; };
-  const ac = () => { audio ||= new AudioContext(); if (audio.state === 'suspended') audio.resume(); return audio; };
-  // One chirp: a sine that slides in pitch, a soft octave on top, and an optional little trill at the end.
-  function chirp(at, from, to, dur, trill = 0, gain = 0.055) {
-    const V = soundVolume(); if (!V) return;
-    try {
-      const c = ac(), t = c.currentTime + at, out = c.createGain();
-      out.gain.setValueAtTime(0.0001, t); out.gain.exponentialRampToValueAtTime(gain * V, t + 0.015);
-      out.gain.setValueAtTime(gain * V, t + dur * 0.6); out.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-      out.connect(c.destination);
-      const tones = [['sine', 1, 1], ['triangle', 2, 0.18]].map(([type, mul, level]) => {
-        const o = c.createOscillator(), g = c.createGain(); o.type = type; g.gain.value = level;
-        o.frequency.setValueAtTime(from * mul, t); o.frequency.exponentialRampToValueAtTime(to * mul, t + dur * 0.7);
-        o.connect(g).connect(out); return o;
-      });
-      if (trill) { const lfo = c.createOscillator(), depth = c.createGain(); lfo.frequency.value = 16; depth.gain.setValueAtTime(0, t); depth.gain.linearRampToValueAtTime(trill, t + dur);
-        lfo.connect(depth); tones.forEach(o => depth.connect(o.frequency)); lfo.start(t); lfo.stop(t + dur + 0.05); }
-      tones.forEach(o => { o.start(t); o.stop(t + dur + 0.05); });
-    } catch {}
-  }  // Bloop / plop: a round, wet blob sound.
-  function blobTone(at, from, to, dur, gain = 0.05) {
-    const V = soundVolume(); if (!V) return;
-    try {
-      const c = ac(), t = c.currentTime + Math.max(0, at), o = c.createOscillator(), g = c.createGain();
-      o.type = 'sine'; o.frequency.setValueAtTime(from, t); o.frequency.exponentialRampToValueAtTime(to, t + dur);
-      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(gain * V, t + 0.012); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-      o.connect(g).connect(c.destination); o.start(t); o.stop(t + dur + 0.03);
-    } catch {}
-  }
-  const sayHi = () => { chirp(0, 760, 1180, 0.09); chirp(0.085, 1180, 1580, 0.2, 28); };                    // "hi~" (up, happy)
-  const sayByeBye = () => { chirp(0, 1180, 940, 0.11); chirp(0.17, 1080, 640, 0.26, 24); };                 // "bye-bye~" (down, a bit sad)
+  // ---- Pip's voice and the island's bloops (sfx-ui.js) ----
+  const sayHi = () => window.__winlandSfx?.pip('hi'), sayByeBye = () => window.__winlandSfx?.pip('bye');
   window.__winlandVoice = { hi: sayHi, bye: sayByeBye }; // handy for testing
 
   // The island itself wobbles like jelly: each "kick" starts a spring.
@@ -365,11 +308,11 @@
   function startHello() {
     const id = ++showId;
     showAt = now(); popAt = now() + 180; setMode('compact', false);
-    kick(0.12); blobTone(0, 180, 620, 0.16, 0.06);                                   // the island plops open: "bloop"
-    step(id, HELLO.land, () => blobTone(0, 520, 240, 0.08, 0.05));                    // he lands: "plop"
+    kick(0.12); window.__winlandSfx?.pip('open');                                   // the island plops open: "bloop"
+    step(id, HELLO.land, () => window.__winlandSfx?.pip('land'));                    // he lands: "plop"
     step(id, HELLO.hi, () => { sayHi(); feel('happy', 1100); waveUntil = now() + 1100; }); // stretches up and says "hi!"
     step(id, HELLO.tilt, () => feel('happy', 600));
-    step(id, HELLO.wink, () => { feel('wink', 450); blobTone(0, 900, 1300, 0.05, 0.025); });
+    step(id, HELLO.wink, () => { feel('wink', 450); window.__winlandSfx?.pip('wink'); });
     // Back to small with a little wobble, unless you already opened the island yourself.
     step(id, HELLO.end, () => { showAt = null; if (mode === 'compact' && !(pointer.known && inside(pointer.x, pointer.y, islandBounds))) { setMode('rest', false); kick(0.07, 3); } });
   }
@@ -399,7 +342,7 @@
     ++showId; byeAt = null; showAt = null; sayByeBye();
     const wasOpen = mode !== 'rest'; if (wasOpen) setMode('rest', false);
     outAt = now() + (wasOpen ? 320 : 120);
-    setTimeout(() => blobTone(0, 520, 160, 0.18, 0.05), (wasOpen ? 320 : 120) + OUT.eyes); // a soft "bloop" as it closes
+    setTimeout(() => window.__winlandSfx?.pip('close'), (wasOpen ? 320 : 120) + OUT.eyes); // a soft "bloop" as it closes
   };
   window.__winlandByeReset = () => { outAt = null; };
   // while the eyes close, everything else in the small island (cover, bars, time) fades with them; after that only the shape is left
