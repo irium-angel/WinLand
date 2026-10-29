@@ -1,0 +1,25 @@
+{
+  "name": "dynamic-winland",
+  "version": "0.1.0",
+  "description": "WinLand : ma Dynamic Island perso pour Windows, 100 % locale (Claude Code, Codex, musique, focus…).",
+  "main": "boot.cjs",
+  "scripts": {
+    "test": "bun test ./tests",
+    "start": "electron .",
+    "check:windows": "bun check-windows.cjs",
+    "build:exe": "bun tools/build-launcher.cjs",
+    "build:setup": "bun tools/build-setup.cjs",
+    "postinstall": "bun tools/build-launcher.cjs"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "electron": "^44.5.1"
+  },
+  "dependencies": {
+    "@openai/codex": "^0.160.0"
+  },
+  "packageManager": "bun@1.3.10"
+}

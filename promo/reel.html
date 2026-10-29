@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8">
+<title>WinLand reel</title>
+<!--
+  WinLand's vertical promo (1080×1920, Reels / TikTok). Every frame is drawn from the time t alone (render(t)), so
+  promo/render-reel.cjs can capture it image by image and the motion is perfectly smooth. Open it in a browser
+  to preview: it plays by itself.
+-->
+<style>
+  @font-face{font-family:Inter;src:url('../assets/fonts/inter-latin-opsz-normal.woff2') format('woff2');font-weight:100 900}
+  @font-face{font-family:Inter;src:url('../assets/fonts/inter-latin-ext-opsz-normal.woff2') format('woff2');font-weight:100 900;unicode-range:U+0100-024F,U+1E00-1EFF,U+2020}
+  *{box-sizing:border-box;margin:0}
+  html,body{width:1080px;height:1920px;overflow:hidden;background:#07070b}
+  body{font-family:Inter,"Segoe UI",sans-serif;color:#fff;-webkit-font-smoothing:antialiased}
+  #stage{position:relative;width:1080px;height:1920px;overflow:hidden;background:#07070b}
+  .abs{position:absolute;left:0;top:0;will-change:transform,opacity}
+  .glow{border-radius:50%;filter:blur(120px)}
+  /* the screen behind the island */
+  #screen{width:940px;height:620px;border-radius:44px;background:linear-gradient(180deg,rgba(255,255,255,.08),rgba(255,255,255,.015));border:2px solid rgba(255,255,255,.09);overflow:hidden}
+  #screen .wall{position:absolute;inset:0;background:radial-gradient(600px 340px at 20% 110%,rgba(124,92,255,.35),transparent 70%),radial-gradient(500px 300px at 95% 0%,rgba(26,167,255,.25),transparent 70%)}
+  #screen .task{position:absolute;left:50%;bottom:22px;transform:translateX(-50%);height:58px;padding:0 18px;border-radius:18px;background:rgba(20,20,28,.7);display:flex;gap:14px;align-items:center}
+  #screen .task i{width:34px;height:34px;border-radius:10px;background:rgba(255,255,255,.14)}
+  #screen .task i:nth-child(1){background:linear-gradient(135deg,#7c5cff,#1aa7ff)}
+  #screen .win{position:absolute;border-radius:16px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.06)}
+  /* the morphing shape: Pip, then the island */
+  #shape{background:#fff;overflow:hidden}
+  #eyes{display:flex;justify-content:center;align-items:center}
+  #eyes i{display:block;flex:none}
+  #inner{display:flex;align-items:center;justify-content:space-between;white-space:nowrap}
+  .side{flex:1;min-width:0;overflow:hidden;display:flex;align-items:center;gap:14px;font-weight:700;font-size:28px}
+  .side span{overflow:hidden;text-overflow:ellipsis}
+  .side.r{justify-content:flex-end;color:#a1a1ab;font-variant-numeric:tabular-nums}
+  .bars{display:flex;gap:5px;align-items:flex-end;height:30px}
+  .bars i{width:7px;border-radius:4px;background:#ff375f}
+  .cover{width:44px;height:44px;border-radius:11px;background:linear-gradient(135deg,#ff375f,#bf5af2)}
+  /* the open island */
+  #panel{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+  .w{height:240px;border-radius:30px;padding:24px 26px;display:flex;flex-direction:column;position:relative;overflow:hidden}
+  .w small{font-size:24px;font-weight:650;color:rgba(255,255,255,.72)}
+  .w b{font-size:56px;font-weight:780;letter-spacing:-1.5px;margin-top:auto;line-height:1.05}
+  .w em{font-style:normal;font-size:22px;font-weight:600;color:rgba(255,255,255,.78);margin-top:4px}
+  .w1{background:linear-gradient(160deg,#173a22,#2f7a46)}
+  .w2{background:linear-gradient(160deg,#21123a,#6236a5)}
+  .w3{background:linear-gradient(160deg,#0d2340,#155ea8)}
+  .apps{display:grid;grid-template-columns:repeat(3,44px);gap:12px;margin-top:auto}
+  .apps i{width:44px;height:44px;border-radius:12px;background:rgba(255,255,255,.22)}
+  /* words */
+  .line{position:absolute;left:0;right:0;text-align:center;font-weight:800;letter-spacing:-.045em;white-space:nowrap}
+  .line span{display:inline-block;will-change:transform,opacity}
+  em{font-style:normal}
+  .grad{padding:0 .04em;background:linear-gradient(135deg,#9d84ff,#3db5ff);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .sub{font-weight:550;letter-spacing:-.01em;color:#a8a8b3}
+  #logo{width:300px;height:300px;border-radius:76px;background:linear-gradient(135deg,#7c5cff,#1aa7ff);box-shadow:0 40px 120px rgba(92,110,255,.55)}
+  #logoPip{position:absolute;left:66px;top:84px;width:168px;height:144px;border-radius:48px;background:linear-gradient(180deg,#fff,#e2e2ea)}
+  #logoPip i{position:absolute;top:44px;width:26px;height:42px;border-radius:14px;background:#1c1c1e}
+  .spark{position:absolute;border-radius:50%;background:#fff}
+</style></head>
+<body>
+<div id="stage">
+  <div class="abs glow" id="g1" style="width:900px;height:900px;background:rgba(124,92,255,.42)"></div>
+  <div class="abs glow" id="g2" style="width:800px;height:800px;background:rgba(26,167,255,.3)"></div>
+  <div class="abs" id="screen"><div class="wall"></div>
+    <div class="win" style="left:70px;top:150px;width:470px;height:300px"></div>
+    <div class="win" style="left:580px;top:210px;width:290px;height:230px"></div>
+    <div class="task"><i></i><i></i><i></i><i></i><i></i></div></div>
+  <div class="abs" id="shape">
+    <div class="abs" id="inner"><div class="side" id="left"></div><div class="side r" id="right"></div></div>
+    <div class="abs" id="eyes"><i></i><i></i></div>
+    <div class="abs" id="panel"></div>
+  </div>
+  <div class="abs" id="logo"><div id="logoPip"><i style="left:44px"></i><i style="right:44px"></i></div></div>
+  <div id="sparks"></div>
+  <div id="words"></div>
+</div>
+<script>
+// ---------- helpers ----------
+const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
+const seg = (t, a, b) => clamp((t - a) / (b - a));
+const lerp = (a, b, k) => a + (b - a) * k;
+const easeOut = k => 1 - Math.pow(1 - k, 3);
+const easeInOut = k => k < .5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;
+const back = k => { const c = 1.7; return 1 + (c + 1) * Math.pow(k - 1, 3) + c * Math.pow(k - 1, 2); };
+const spring = k => k >= 1 ? 1 : 1 - Math.exp(-6 * k) * Math.cos(11 * k);
+const mix = (a, b, k) => `rgb(${a.map((v, i) => Math.round(lerp(v, b[i], k))).join(',')})`;
+const $ = id => document.getElementById(id);
+const set = (el, s) => { for (const k in s) el.style[k] = s[k]; };
+const DURATION = 16, ORANGE = [255, 159, 10], GREEN = [48, 209, 88], WHITE = [255, 255, 255], INK = [28, 28, 30];
+
+// ---------- the words: each line slides in word by word ----------
+const LINES = [
+  { a: 0.5, b: 2.15, y: 1330, size: 112, html: 'Voici <em class="grad">Pip.</em>' },
+  { a: 1.05, b: 2.15, y: 1470, size: 46, cls: 'sub', html: 'Il vit en haut de ton écran.' },
+  { a: 2.75, b: 4.25, y: 1320, size: 128, html: '<em class="grad">WinLand</em>' },
+  { a: 3.1, b: 4.25, y: 1470, size: 46, cls: 'sub', html: 'La Dynamic Island pour Windows' },
+  { a: 4.55, b: 5.95, y: 1330, size: 92, html: 'Ton IA bosse…' },
+  { a: 6.1, b: 7.45, y: 1330, size: 92, html: 'Tu le sais <em class="grad">direct.</em>' },
+  { a: 7.75, b: 10.25, y: 1320, size: 96, html: 'Ta musique,' },
+  { a: 8.05, b: 10.25, y: 1440, size: 96, html: '<em class="grad">en direct.</em>' },
+  { a: 10.65, b: 13.25, y: 1330, size: 82, html: 'Focus. Fichiers.' },
+  { a: 10.95, b: 13.25, y: 1440, size: 82, html: '<em class="grad">Tes logiciels.</em>' },
+  { a: 13.75, b: 99, y: 1260, size: 140, html: 'WinLand' },
+  { a: 14.05, b: 99, y: 1410, size: 46, cls: 'sub', html: 'La Dynamic Island pour Windows' }
+];
+$('words').innerHTML = LINES.map((l, i) => `<div class="line ${l.cls || ''}" id="l${i}" style="top:${l.y}px;font-size:${l.size}px">${
+  l.html.replace(/(<em[^>]*>)(.*?)(<\/em>)|([^<\s]+)/g, (m, o, inner, c, word) => word ? `<span>${word}</span>` : inner.split(' ').map(x => `<span>${o}${x}${c}</span>`).join(' '))}</div>`).join('');
+function words(t) {
+  LINES.forEach((l, i) => {
+    const el = $('l' + i), spans = el.querySelectorAll('span'), out = easeInOut(seg(t, l.b - 0.3, l.b));
+    el.style.display = t < l.a - 0.05 || t > l.b + 0.05 ? 'none' : 'block';
+    spans.forEach((s, j) => {
+      const k = easeOut(seg(t, l.a + j * 0.07, l.a + j * 0.07 + 0.45));
+      s.style.transform = `translateY(${(1 - k) * 60 - out * 40}px)`; s.style.opacity = k * (1 - out);
+      s.style.filter = `blur(${(1 - k) * 10 + out * 8}px)`;
+    });
+  });
+}
+
+// ---------- the island's content per moment ----------
+const ICON = {
+  claude: '<svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#d97757" stroke-width="2.6" stroke-linecap="round"><path d="M12 3v18M3 12h18M5.6 5.6l12.8 12.8M18.4 5.6L5.6 18.4"/></svg>',
+  check: '<svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#30d158" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>'
+};
+let lastInner = '';
+function inner(html) { if (html !== lastInner) { lastInner = html; const [l, r] = html.split('|'); $('left').innerHTML = l || ''; $('right').innerHTML = r || ''; } }
+$('panel').innerHTML = `<div class="w w1"><small>Claude Code</small><b>1:24</b><em>Terminé</em></div>
+  <div class="w w2"><small>Focus</small><b>25:00</b><em>Prêt à démarrer</em></div>
+  <div class="w w3"><small>Logiciels</small><div class="apps"><i></i><i></i><i></i><i></i><i></i><i></i></div><em>6 logiciels</em></div>`;
+
+// ---------- sparks at the "done" moment and the end ----------
+const SPARKS = Array.from({ length: 34 }, (_, i) => ({ a: (i / 34) * Math.PI * 2 + (i % 3) * 0.2, d: 160 + (i * 53) % 220, s: 6 + (i * 7) % 12, c: ['#7c5cff', '#1aa7ff', '#30d158', '#ffd60a', '#ffffff'][i % 5] }));
+$('sparks').innerHTML = SPARKS.map(() => '<div class="spark abs"></div>').join('');
+function sparks(t, at, cx, cy) {
+  const k = seg(t, at, at + 1.1);
+  [...$('sparks').children].forEach((el, i) => {
+    const s = SPARKS[i], e = easeOut(k), r = s.d * e;
+    set(el, { width: s.s + 'px', height: s.s + 'px', background: s.c, opacity: k > 0 && k < 1 ? (1 - k) : 0,
+      transform: `translate(${cx + Math.cos(s.a) * r - s.s / 2}px,${cy + Math.sin(s.a) * r * 0.75 + k * k * 120 - s.s / 2}px)` });
+  });
+}
+
+// ---------- one frame ----------
+function render(t) {
+  // background glows drift slowly
+  set($('g1'), { transform: `translate(${-220 + Math.sin(t * .4) * 90}px,${-200 + Math.cos(t * .35) * 70}px)` });
+  set($('g2'), { transform: `translate(${520 + Math.cos(t * .3) * 80}px,${1150 + Math.sin(t * .45) * 90}px)` });
+  const outro = easeInOut(seg(t, 13.2, 13.9));
+
+  // the screen
+  const scr = easeOut(seg(t, 2.25, 3.0)) * (1 - outro);
+  set($('screen'), { opacity: scr, transform: `translate(70px,${420 + (1 - scr) * 70}px) scale(${0.94 + scr * 0.06})` });
+
+  // the shape: Pip (big, white) → island (black pill at the top of the screen) → open panel
+  const born = back(seg(t, 0.15, 0.85)), morph = easeInOut(seg(t, 2.2, 3.0));
+  const open = spring(seg(t, 10.3, 11.3)) * (1 - easeInOut(seg(t, 12.9, 13.4)));
+  const widthIsland = 720; // room for the text on both sides of the eyes
+  const wGrow = easeOut(seg(t, 4.25, 4.7)) * (t < 7.6 ? 1 : 0) + (t >= 7.6 ? easeOut(seg(t, 7.6, 8.0)) : 0);
+  let w = lerp(300, t < 4.25 ? 420 : lerp(420, widthIsland, wGrow), morph), h = lerp(256, 72, morph), r = lerp(88, 36, morph);
+  let cx = 540, cy = lerp(860, 470, morph);
+  w = lerp(w, 900, open); h = lerp(h, 380, open); r = lerp(r, 56, open); cy = lerp(cy, 470 + 154, open);
+  const pipScale = t < 2.2 ? born : 1, gone = 1 - outro;
+  set($('shape'), { width: w + 'px', height: h + 'px', borderRadius: r + 'px', opacity: gone,
+    background: mix(WHITE, [0, 0, 0], morph), boxShadow: `0 ${lerp(50, 24, morph)}px ${lerp(90, 60, morph)}px rgba(0,0,0,${lerp(.45, .6, morph)})`,
+    transform: `translate(${cx - w / 2}px,${cy - h / 2}px) scale(${pipScale}) translateY(${t < 2.2 ? Math.sin(t * 3) * 10 : 0}px)` });
+
+  // eyes: size, colour, blinks, looks around
+  const state = t < 4.45 ? 'idle' : t < 6.05 ? 'busy' : t < 7.6 ? 'done' : t < 10.3 ? 'music' : 'idle';
+  const ec = state === 'busy' ? ORANGE : state === 'done' ? GREEN : mix(INK, WHITE, morph) && null;
+  const eyeCol = ec ? `rgb(${ec.join(',')})` : mix(INK, WHITE, morph);
+  const blink = [1.35, 3.6, 9.2, 12.0].some(b => t > b && t < b + 0.14) ? 0.12 : 1;
+  const ew = lerp(40, 14, morph), eh0 = lerp(60, 22, morph), gap = lerp(64, 14, morph);
+  const happy = state === 'done' ? easeOut(seg(t, 6.05, 6.35)) : 0;
+  const bob = state === 'music' ? Math.abs(Math.sin(t * 7.5)) * 4 : 0;
+  const look = t < 2.2 ? Math.sin(seg(t, 1.6, 2.2) * Math.PI * 2) * 16 : 0;
+  set($('eyes'), { left: (w / 2 - (ew * 2 + gap) / 2 + look) + 'px', top: (h / 2 - eh0 / 2 - bob + (open ? -open * 120 : 0)) + 'px', width: (ew * 2 + gap) + 'px', height: eh0 + 'px', gap: gap + 'px', opacity: 1 - open });
+  $('eyes').querySelectorAll('i').forEach(e => set(e, { width: ew + 'px', height: (eh0 * blink * (1 - happy * 0.55)) + 'px', borderRadius: (ew * 0.6) + 'px ' + (ew * 0.6) + 'px ' + (happy ? 4 : ew * 0.6) + 'px ' + (happy ? 4 : ew * 0.6) + 'px', background: eyeCol,
+    boxShadow: ec ? `0 0 ${18 * morph}px rgba(${ec.join(',')},.75)` : 'none', marginTop: (eh0 * (1 - blink) / 2) + 'px' }));
+
+  // island sides
+  const sideIn = easeOut(seg(t, 4.45, 4.8)) * (1 - easeOut(seg(t, 10.2, 10.45)));
+  set($('inner'), { left: '30px', top: '0px', width: (w - 60) + 'px', height: h + 'px', gap: (ew * 2 + gap + 56) + 'px', opacity: sideIn * (1 - open) });
+  if (state === 'busy') inner(`${ICON.claude}<span>Écrit les tests</span>|0:${String(Math.floor((t - 4.45) * 9 + 31)).padStart(2, '0')}`);
+  else if (state === 'done') inner(`${ICON.check}<span style="color:#30d158">Terminé</span>|1:24`);
+  else if (state === 'music') inner(`<div class="cover"></div><span>Midnight Drive</span>|<div class="bars">${'<i></i>'.repeat(5)}</div>`);
+  if (state === 'music') $('right').querySelectorAll('.bars i').forEach((b, i) => { b.style.height = (8 + Math.abs(Math.sin(t * (5 + i) + i * 1.7)) * 22) + 'px'; });
+
+  // the open island: three widgets pop in one by one
+  set($('panel'), { left: '40px', top: '70px', width: (w - 80) + 'px', opacity: open });
+  $('panel').querySelectorAll('.w').forEach((c, i) => { const k = back(seg(t, 10.55 + i * 0.12, 11.0 + i * 0.12)); set(c, { transform: `scale(${0.6 + k * 0.4})`, opacity: clamp(k) }); });
+
+  // the end: the logo tile, Pip winks
+  const logo = back(seg(t, 13.35, 14.0));
+  set($('logo'), { opacity: clamp(logo * 1.2), transform: `translate(390px,${760 - 40 * (1 - logo)}px) scale(${0.5 + logo * 0.5}) rotate(${(1 - logo) * -8}deg)` });
+  const wink = t > 15.0 && t < 15.35 ? 0.1 : 1;
+  $('logoPip').children[1].style.transform = `scaleY(${wink})`;
+
+  sparks(t, t < 13 ? 6.05 : 13.5, t < 13 ? 540 : 540, t < 13 ? 470 : 910);
+  words(t);
+}
+window.render = render;
+window.DURATION = DURATION;
+
+// ---------- the soundtrack, made here (no music from anyone else) ----------
+window.soundtrack = async () => {
+  const rate = 44100, ctx = new OfflineAudioContext(2, rate * DURATION, rate), out = ctx.createGain(); out.gain.value = 0.8; out.connect(ctx.destination);
+  const verb = ctx.createConvolver(); const ir = ctx.createBuffer(2, rate * 2, rate);
+  for (let c = 0; c < 2; c++) { const d = ir.getChannelData(c); for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 3); }
+  verb.buffer = ir; const wet = ctx.createGain(); wet.gain.value = 0.25; verb.connect(wet).connect(out);
+  const note = (f, at, len, type = 'sine', vol = 0.12, toVerb = true) => {
+    const o = ctx.createOscillator(), g = ctx.createGain(); o.type = type; o.frequency.value = f;
+    g.gain.setValueAtTime(0.0001, at); g.gain.exponentialRampToValueAtTime(vol, at + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, at + len);
+    o.connect(g).connect(out); if (toVerb) g.connect(verb); o.start(at); o.stop(at + len + 0.05);
+  };
+  const kick = at => { const o = ctx.createOscillator(), g = ctx.createGain(); o.frequency.setValueAtTime(140, at); o.frequency.exponentialRampToValueAtTime(42, at + 0.25);
+    g.gain.setValueAtTime(0.9, at); g.gain.exponentialRampToValueAtTime(0.0001, at + 0.4); o.connect(g).connect(out); o.start(at); o.stop(at + 0.45); };
+  const hat = at => { const b = ctx.createBuffer(1, rate * 0.05, rate), d = b.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length);
+    const s = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain(); f.type = 'highpass'; f.frequency.value = 7000; g.gain.value = 0.18; s.buffer = b; s.connect(f).connect(g).connect(out); s.start(at); };
+  const whoosh = (at, len = 0.7) => { const b = ctx.createBuffer(1, rate * len, rate), d = b.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.sin(Math.PI * i / d.length);
+    const s = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain(); f.type = 'bandpass'; f.Q.value = 2; f.frequency.setValueAtTime(400, at); f.frequency.exponentialRampToValueAtTime(3500, at + len);
+    g.gain.value = 0.35; s.buffer = b; s.connect(f).connect(g).connect(out); g.connect(verb); s.start(at); };
+  // a soft chord bed: Fmaj7 – Am7 – Dm9 – Bbmaj7 (120 bpm, 2 bars each)
+  const CH = [[174.6, 220, 261.6, 329.6], [220, 261.6, 329.6, 392], [146.8, 220, 261.6, 349.2], [116.5, 233.1, 293.7, 349.2]];
+  for (let i = 0; i < 8; i++) for (const f of CH[i % 4]) note(f, i * 2, 2.1, 'triangle', 0.035);
+  // beat from the island's arrival, quieter at the very end
+  for (let b = 2.25; b < 13.25; b += 0.5) { kick(b); hat(b + 0.25); }
+  // sparkly arpeggio while the music plays
+  for (let i = 0; i < 20; i++) note([523.3, 659.3, 784, 987.8][i % 4], 7.75 + i * 0.125, 0.25, 'sine', 0.05);
+  // moments: Pip pops, morph, done, panel, logo
+  note(880, 0.35, 0.3, 'sine', 0.18); note(1318.5, 0.45, 0.35, 'sine', 0.12);
+  whoosh(2.0); note(1046.5, 6.05, 0.5, 'sine', 0.16); note(1568, 6.15, 0.6, 'sine', 0.12);
+  whoosh(10.1, 0.5); [10.55, 10.67, 10.79].forEach((a, i) => note(660 + i * 220, a, 0.2, 'sine', 0.1));
+  whoosh(13.1); note(523.3, 13.5, 2.4, 'sine', 0.14); note(659.3, 13.5, 2.4, 'sine', 0.1); note(784, 13.5, 2.4, 'sine', 0.1); note(1046.5, 13.6, 2.2, 'sine', 0.08);
+  note(1760, 15.05, 0.2, 'sine', 0.1);
+  const buf = await ctx.startRendering();
+  // WAV (16-bit) as base64
+  const ch = [buf.getChannelData(0), buf.getChannelData(1)], n = buf.length, bytes = new DataView(new ArrayBuffer(44 + n * 4));
+  const str = (o, s) => [...s].forEach((c, i) => bytes.setUint8(o + i, c.charCodeAt(0)));
+  str(0, 'RIFF'); bytes.setUint32(4, 36 + n * 4, true); str(8, 'WAVEfmt '); bytes.setUint32(16, 16, true); bytes.setUint16(20, 1, true); bytes.setUint16(22, 2, true);
+  bytes.setUint32(24, rate, true); bytes.setUint32(28, rate * 4, true); bytes.setUint16(32, 4, true); bytes.setUint16(34, 16, true); str(36, 'data'); bytes.setUint32(40, n * 4, true);
+  for (let i = 0; i < n; i++) for (let c = 0; c < 2; c++) { const v = Math.max(-1, Math.min(1, ch[c][i] * (i > n - rate * 0.8 ? (n - i) / (rate * 0.8) : 1))); bytes.setInt16(44 + i * 4 + c * 2, v * 32767, true); }
+  let bin = ''; const u8 = new Uint8Array(bytes.buffer); for (let i = 0; i < u8.length; i += 32768) bin += String.fromCharCode.apply(null, u8.subarray(i, i + 32768));
+  return btoa(bin);
+};
+
+// preview in a browser: plays by itself (the renderer sets ?still to drive it frame by frame)
+if (!location.search.includes('still')) { const t0 = performance.now(); (function loop() { render(((performance.now() - t0) / 1000) % DURATION); requestAnimationFrame(loop); })(); }
+else render(0);
+</script>
+</body></html>

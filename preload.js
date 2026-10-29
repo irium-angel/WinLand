@@ -1,0 +1,151 @@
+(function preloadBridge() {
+  'use strict';
+
+  const { contextBridge, ipcRenderer, webUtils } = require('electron');
+
+  function subscribe(channel, callback) {
+    if (typeof callback !== 'function') {
+      return () => {};
+    }
+
+    const listener = (_event, data) => callback(data);
+
+    ipcRenderer.on(channel, listener);
+
+    return () => ipcRenderer.removeListener(channel, listener);
+  }
+
+  contextBridge.exposeInMainWorld('winland', {
+    // start with Windows, restart, and the language for the tray menu (tray-main.cjs)
+    loginGet: () => ipcRenderer.invoke('app:login-get'),
+    firstRun: () => ipcRenderer.invoke('app:first-run'), // what you chose in the installer (once)
+    loginSet: on => ipcRenderer.invoke('app:login-set', Boolean(on)),
+    restart: () => ipcRenderer.send('app:restart'),
+    setLang: lang => ipcRenderer.send('app:lang', lang === 'en' ? 'en' : 'fr'),
+
+    spotifyConnect: () => ipcRenderer.invoke('spotify:connect'),
+    spotifyGetState: () => ipcRenderer.invoke('spotify:get-state'),
+    spotifyControl: action =>
+      ipcRenderer.invoke('spotify:control', action),
+    onMusic: callback => subscribe('media:changed', callback), // the player changed (media-main.cjs push)
+    spotifySeek: positionMs =>
+      ipcRenderer.invoke('spotify:seek', positionMs),
+    spotifyDisconnect: () =>
+      ipcRenderer.invoke('spotify:disconnect'),
+
+    // Dev page (dev-main.cjs)
+    devGet: () => ipcRenderer.invoke('dev:get'),
+    devAddFolder: () => ipcRenderer.invoke('dev:add-folder'),
+    devForgetFolder: dir => ipcRenderer.invoke('dev:forget-folder', String(dir || '')),
+    devStop: pid => ipcRenderer.invoke('dev:stop', Number(pid)),
+    devWatch: on => ipcRenderer.send('dev:watch', Boolean(on)),
+    devDocker: (id, action) => ipcRenderer.invoke('dev:docker', { id: String(id || ''), action: String(action || '') }),
+    devOpenCode: dir => ipcRenderer.invoke('dev:open-code', String(dir || '')),
+    onDevFinished: callback => subscribe('dev:finished', callback),
+
+    // Codex sign-in for Pip's chat (ai-account-main.cjs)
+    aiSettingsGet: () => ipcRenderer.invoke('ai-settings:get'),
+    aiSettingsChatGPTLogin: () =>
+      ipcRenderer.invoke('ai-settings:chatgpt-login'),
+    aiSettingsChatGPTCancel: () =>
+      ipcRenderer.invoke('ai-settings:chatgpt-cancel'),
+    aiSettingsChatGPTLogout: () =>
+      ipcRenderer.invoke('ai-settings:chatgpt-logout'),
+
+    aiMonitorGet: () => ipcRenderer.invoke('ai-monitor:get'),
+    aiMonitorWindows: () => ipcRenderer.invoke('ai-monitor:windows'),
+    aiMonitorConnect: (provider, targetId) => ipcRenderer.invoke('ai-monitor:connect', { provider, targetId }),
+    aiMonitorDisconnect: provider => ipcRenderer.invoke('ai-monitor:disconnect', { provider }),
+    aiMonitorOpenSource: provider => ipcRenderer.invoke('ai-monitor:open-source', { provider }),
+    aiMonitorHooksInstall: agent => ipcRenderer.invoke('ai-monitor:hooks-install', { agent }),
+    aiMonitorHooksUninstall: agent => ipcRenderer.invoke('ai-monitor:hooks-uninstall', { agent }),
+    // Extras: file tray, volume, Bluetooth battery, clipboard, note
+    pathForFile: file => { try { return webUtils.getPathForFile(file); } catch { return ''; } },
+    trayGet: () => ipcRenderer.invoke('extras:tray-get'),
+    trayAdd: paths => ipcRenderer.invoke('extras:tray-add', { paths }),
+    trayRemove: filePath => ipcRenderer.invoke('extras:tray-remove', { path: filePath }),
+    trayOpen: filePath => ipcRenderer.invoke('extras:tray-open', { path: filePath }),
+    trayDrag: filePath => ipcRenderer.send('extras:tray-drag', filePath),
+    onVolume: callback => subscribe('extras:volume', callback),
+    volumeSet: level => ipcRenderer.invoke('extras:volume-set', { level }),
+    volumeGet: () => ipcRenderer.invoke('extras:volume-get'),
+    clipsGet: () => ipcRenderer.invoke('extras:clips-get'),
+    clipsCopy: index => ipcRenderer.invoke('extras:clips-copy', { index }),
+    clipsClear: () => ipcRenderer.invoke('extras:clips-clear'),
+    onClips: callback => subscribe('extras:clips', callback),
+    noteGet: () => ipcRenderer.invoke('extras:note-get'),
+    noteSet: text => ipcRenderer.invoke('extras:note-set', { text }),
+    onShortcut: callback => subscribe('extras:shortcut', callback),
+    onBluetooth: callback => subscribe('extras:bluetooth', callback),
+    // the window in front (none / cover / game) and what the island does about it (main.js island:presence)
+    onForeground: callback => subscribe('extras:foreground', callback),
+    onPrivacy: callback => subscribe('extras:privacy', callback), // apps using the microphone / camera
+    privacyGet: () => ipcRenderer.invoke('extras:privacy-get'),
+    onNewFile: callback => subscribe('extras:new-file', callback), // a new screenshot or a finished download
+    // Controls page (controls-ui.js)
+    outputsGet: () => ipcRenderer.invoke('extras:outputs'),
+    systemGet: () => ipcRenderer.invoke('extras:system'), // System page: processor, graphics card, memory
+    softwareGet: fresh => ipcRenderer.invoke('software:get', { fresh: Boolean(fresh) }), // Software page: your installed programs
+    softwareOpen: (id, file) => ipcRenderer.invoke('software:open', { id: String(id || ''), file: file ? String(file) : '' }),
+    outputSet: id => ipcRenderer.invoke('extras:output-set', { id: String(id || '') }),
+    lockPc: () => ipcRenderer.invoke('extras:lock'),
+    snip: () => ipcRenderer.invoke('extras:snip'),
+    openClock: () => ipcRenderer.invoke('extras:clock'),
+    muteSet: on => ipcRenderer.invoke('extras:mute', { on: Boolean(on) }),
+    foregroundGet: () => ipcRenderer.invoke('extras:foreground-get'),
+    setPresence: how => ipcRenderer.send('island:presence', ['normal', 'peek', 'hidden'].includes(how) ? how : 'normal'),
+    aiMonitorHooksAnswer:(sessionId, answers) => ipcRenderer.invoke('ai-monitor:hooks-answer', { sessionId, answers }),
+    aiMonitorHooksPlan: (sessionId, approve, feedback) => ipcRenderer.invoke('ai-monitor:hooks-plan', { sessionId, approve, feedback }),
+    aiMonitorHooksJump: sessionId => ipcRenderer.invoke('ai-monitor:hooks-jump', { sessionId }),
+    aiMonitorHooksModel: model => ipcRenderer.invoke('ai-monitor:hooks-model', { model }),
+    aiMonitorHooksTest: (kind, command) => ipcRenderer.invoke('ai-monitor:hooks-test', { kind, command }),
+    aiMonitorSetNotify:enabled => ipcRenderer.invoke('ai-monitor:set-notify', { enabled }),
+    aiMonitorHooksReply:(sessionId, text) => ipcRenderer.invoke('ai-monitor:hooks-reply', { sessionId, text }),
+    aiMonitorHooksSeen:() => ipcRenderer.invoke('ai-monitor:hooks-seen'),
+    aiMonitorHooksDecide:(sessionId, behavior) => ipcRenderer.invoke('ai-monitor:hooks-decide', { sessionId, behavior }),
+    aiMonitorReply:(provider, questionId, text) => ipcRenderer.invoke('ai-monitor:reply', { provider, questionId, text }),
+    onAiMonitorState: callback => subscribe('ai-monitor:state', callback),
+    onAiMonitorOpen: callback => subscribe('ai-monitor:open', callback),
+
+    setIslandInteractive: interactive =>
+      ipcRenderer.send('island:set-interactive', interactive),
+    setIslandState: state =>
+      ipcRenderer.send('island:set-state', state),
+    setMode: mode =>
+      ipcRenderer.send('window:set-mode', mode),
+    close: () =>
+      ipcRenderer.send('window:close'),
+    notify: (title, body, url) =>
+      ipcRenderer.send('winland:notify', { title, body, url }),
+    onPointer: callback =>
+      subscribe('companion:pointer', callback),
+    onGoodbye: callback =>
+      subscribe('winland:goodbye', callback),
+    // Pip Buddy (buddy-main.cjs): the picker, then the chat about what he looked at
+    settingsOpen: tab => ipcRenderer.send('settings-app:open', typeof tab === 'string' ? tab : ''), // the WinLand app, its own window
+    buddyGrab: info => ipcRenderer.send('buddy:grab', info), // starts the picker
+    onBuddyShortcut: callback => subscribe('buddy:shortcut', callback), // Ctrl+Alt+Space
+    buddyDrop: () => ipcRenderer.send('buddy:drop'),
+    buddyFrame: url => ipcRenderer.send('buddy:frame', url),
+    // Pip's chat in the island (chat-ui.js)
+    buddyAsk: (kind, text, history, lang) => ipcRenderer.invoke('buddy:ask', { kind, text, history, lang }),
+    buddyApply: () => ipcRenderer.invoke('buddy:apply'),
+    buddyForget: () => ipcRenderer.send('buddy:forget'),
+    buddyAi: () => ipcRenderer.invoke('buddy:ai'),
+    buddyUseAi: id => ipcRenderer.invoke('buddy:use-ai', id),
+    buddyLogin: () => ipcRenderer.invoke('buddy:login'),
+    buddyApplyFix: () => ipcRenderer.invoke('buddy:apply-fix'),
+    buddyCancelFix: () => ipcRenderer.send('buddy:cancel-fix'),
+    onBuddyChat: callback => subscribe('buddy:chat', callback),
+    settingsFrame: url => ipcRenderer.send('settings-app:frame', url), // the settings app's own Pip
+    // which apps are open (license-main.cjs): all of them
+    licenseGet: () => ipcRenderer.invoke('license:get'),
+    onLicense: callback => subscribe('license:changed', callback),
+    onBuddy: callback => {
+      subscribe('buddy:home', () => callback('home'));
+      subscribe('buddy:mood', data => callback('mood', data));
+      subscribe('buddy:collapse', () => callback('collapse'));
+      subscribe('buddy:dropped', () => callback('dropped'));
+    }
+  });
+})();

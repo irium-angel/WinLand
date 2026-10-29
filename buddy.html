@@ -1,0 +1,70 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src data:; style-src 'unsafe-inline'; script-src 'self' 'unsafe-inline'">
+<!--
+  The picker (buddy-main.cjs): one see-through layer over the screen while you choose what Pip should look at.
+  A bar at the top says what to do, the window under the mouse gets a frame with its name, a click picks it
+  (Pip looks at it and the chat opens in the island), Esc or a right click cancels. Nothing else lives here.
+-->
+<style>
+  html,body{margin:0;width:100%;height:100%;overflow:hidden;background:transparent;font-family:"Segoe UI Variable Text","Segoe UI",system-ui,sans-serif;user-select:none}
+  body.picking{cursor:crosshair;background:rgba(0,0,0,.18)}
+  #bar{position:absolute;left:50%;top:18px;transform:translate(-50%,-12px);opacity:0;display:flex;align-items:center;gap:10px;padding:9px 16px 9px 12px;border-radius:999px;
+    background:#111114;color:#f2f2f4;font:600 13px inherit;font-family:inherit;box-shadow:0 0 0 1px #2a2a31,0 12px 34px rgba(0,0,0,.5);transition:opacity .18s,transform .18s;white-space:nowrap}
+  #bar.on{opacity:1;transform:translate(-50%,0)}
+  #bar i{width:18px;height:18px;border-radius:6px;background:#f2f2f4;position:relative;flex:none}
+  #bar i::before,#bar i::after{content:"";position:absolute;top:6px;width:3px;height:6px;border-radius:2px;background:#111114}
+  #bar i::before{left:4.5px}#bar i::after{right:4.5px}
+  #bar kbd{font:600 11px inherit;font-family:inherit;color:#9a9aa6;background:#24242b;border-radius:6px;padding:2px 7px}
+  #lens{position:absolute;opacity:0;pointer-events:none;border-radius:12px;transition:opacity .15s,left .12s ease-out,top .12s ease-out,width .12s ease-out,height .12s ease-out;
+    box-shadow:0 0 0 2px #64d2ff,0 0 0 5px rgba(100,210,255,.18);background:rgba(100,210,255,.06);overflow:hidden}
+  #lens.home{box-shadow:0 0 0 2px #ff9f0a,0 0 0 5px rgba(255,159,10,.2);background:rgba(255,159,10,.08)}
+  #lens .label{position:absolute;left:10px;top:10px;padding:4px 10px;border-radius:999px;background:#64d2ff;color:#04121a;font:600 12px inherit;font-family:inherit;white-space:nowrap;max-width:calc(100% - 20px);overflow:hidden;text-overflow:ellipsis}
+  #lens.home .label{background:#ff9f0a}
+  #lens .scan{position:absolute;inset:0;background:linear-gradient(transparent 65%,rgba(100,210,255,.25) 92%,rgba(100,210,255,.55));display:none}
+  #lens.scanning .scan{display:block;animation:scan 1s ease-in-out infinite}
+  @keyframes scan{from{transform:translateY(-100%)}to{transform:translateY(0)}}
+  @media (prefers-reduced-motion: reduce){#lens,#bar{transition:none}#lens.scanning .scan{animation:none}}
+</style></head>
+<body>
+<div id="bar"><i></i><span id="barText"></span><kbd id="barKey"></kbd></div>
+<div id="lens"><span class="label" id="lensLabel"></span><div class="scan"></div></div>
+<script>
+const $ = s => document.querySelector(s), lens = $('#lens'), bar = $('#bar');
+const T = {
+  fr: { pick: 'Clique sur la fenêtre que Pip doit regarder', key: 'Échap pour annuler', look: 'Pip regarde…', cancel: 'Annuler', any: 'Cette partie de l’écran' },
+  en: { pick: 'Click the window Pip should look at', key: 'Esc to cancel', look: 'Pip is looking…', cancel: 'Cancel', any: 'This part of the screen' }
+};
+let lang = 'fr', mode = 'hidden', sent = false;
+const t = key => T[lang][key];
+
+function placeLens(r) { Object.assign(lens.style, { left: r.x + 'px', top: r.y + 'px', width: r.width + 'px', height: r.height + 'px' }); }
+function setLens(state, app) {
+  lens.style.opacity = state ? 1 : 0;
+  lens.classList.toggle('home', state === 'home');
+  lens.classList.toggle('scanning', state === 'look');
+  if (state) $('#lensLabel').textContent = state === 'look' ? t('look') : state === 'home' ? t('cancel') : app || t('any');
+}
+function showBar(on) { $('#barText').textContent = t('pick'); $('#barKey').textContent = t('key'); bar.classList.toggle('on', on); }
+
+// a click picks the window under the mouse; Esc or a right click cancels
+addEventListener('mousedown', e => {
+  if (mode !== 'pick' || sent) return;
+  e.preventDefault(); sent = true;
+  if (e.button === 2) window.buddy.home(); else window.buddy.letGo();
+});
+addEventListener('contextmenu', e => e.preventDefault());
+addEventListener('keydown', e => { if (e.key === 'Escape' && mode === 'pick' && !sent) { sent = true; window.buddy.home(); } });
+
+window.buddy.onState(s => {
+  lang = s.lang === 'en' ? 'en' : 'fr';
+  mode = s.state === 'carry' || s.state === 'pick' ? 'pick' : s.state;
+  sent = false;
+  document.body.classList.toggle('picking', mode === 'pick');
+  showBar(mode === 'pick');
+  if (mode === 'pick') setLens(null);
+  if (mode === 'looking') { placeLens(s.lens); setLens('look'); }
+  if (mode === 'home' || mode === 'hidden') setLens(null);
+});
+window.buddy.onLens(l => { if (mode !== 'pick') return; if (l) { placeLens(l.rect); setLens(l.home ? 'home' : 'pick', l.app); } else setLens(null); });
+</script></body></html>
