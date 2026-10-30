@@ -2165,17 +2165,20 @@
     } else window.__winlandIcon?.(app.icon, cx, cy, s * 0.46, app.c, null, 'rgba(0,0,0,0)');
     return { b, over };
   }
+  window.__winlandAppRows = () => { const off = window.__winlandAppsOff?.() || new Set(); return HOME_ICONS.filter(a => !off.has(a.id)).length > 14 ? 3 : 2; };
   drawApps = function (area) {
     const focus = window.__winlandFocus, p = top(), tray = window.__winlandTrayCount?.() || 0, en = EN();
     const off = window.__winlandAppsOff?.() || new Set(), shown = HOME_ICONS.filter(a => !off.has(a.id));
     for (const a of HOME_ICONS) if (!shown.includes(a)) delete hit[a.key];
-    const cols = Math.min(7, Math.max(5, Math.ceil(shown.length / 2))), rows = Math.ceil(shown.length / cols), s = 44, colW = area.width / cols, rowH = 82; // 2 rows: a third did not fit
+    // up to 14 apps: 2 rows; more: 3 smaller rows (the Apps page is taller then, pages-ui.js), else the last ones were hidden
+    const three = shown.length > 14;
+    const cols = three ? Math.ceil(shown.length / 3) : Math.min(7, Math.max(5, Math.ceil(shown.length / 2))), rows = Math.ceil(shown.length / cols), s = three ? 40 : 44, colW = area.width / cols, rowH = three ? 68 : 82;
     const y0 = area.y + Math.max(8, (area.height - rows * rowH) / 2) + s / 2;
     shown.forEach((app, i) => {
       const cx = area.x + colW * (i % cols) + colW / 2, cy = y0 + Math.floor(i / cols) * rowH;
       const { b } = homeIcon(cx, cy, s, app);
       const label = app.id === 'focus' && focus?.active() ? focus.label() : en ? app.en : app.nl;
-      text(label, cx, cy + s / 2 + 16, 11, '#ffffff', 500, 'center', colW - 8);
+      text(label, cx, cy + s / 2 + 16, three ? 10 : 11, '#ffffff', 500, 'center', colW - 8);
       // little red badges, like on the iPhone: files in the tray, Claude waiting for you
       const count = app.id === 'tray' ? tray : app.id === 'claude' && p && (p.permission || p.state === 'question') ? 1 : 0;
       if (count) { ctx.save(); ctx.beginPath(); ctx.arc(cx + s / 2 - 4, cy - s / 2 + 4, 10, 0, Math.PI * 2); ctx.fillStyle = '#ff4245'; ctx.fill(); ctx.restore(); text(String(count), cx + s / 2 - 4, cy - s / 2 + 8, 11, '#fff', 700, 'center'); }

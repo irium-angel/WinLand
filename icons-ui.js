@@ -110,10 +110,13 @@
     { view: 'controls', icon: 'controls', tint: '#ff9f0a', nl: 'Bediening', en: 'Controls' },
     { view: 'system', icon: 'system', tint: '#30d158', nl: 'Systeem', en: 'System' },
     { view: 'studio', icon: 'studio', tint: '#bf5af2', nl: 'Studio', en: 'Studio' },
-    { view: 'software', icon: 'software', tint: '#0a84ff', nl: 'Programma\'s', en: 'Software' }
+    { view: 'software', icon: 'software', tint: '#0a84ff', nl: 'Programma\'s', en: 'Software' },
+    { view: 'dashboard', icon: 'chart', tint: '#d97757', nl: 'Dashboard', en: 'Dashboard' },
+    { view: 'rules', icon: 'bolt', tint: '#ffd60a', nl: 'Automatisaties', en: 'Automations' },
+    { view: 'remote', icon: 'phone', tint: '#30d158', nl: 'Telefoon', en: 'Phone' }
   ];
   // only the apps that are on (Settings → Apps, or a profile): an app you turned off has no tab either
-  const PAGE_APP = { monitor: 'claude', spotify: 'spotify', chat: 'buddy', focus: 'focus', tray: 'tray', clips: 'clips', note: 'note', mirror: 'mirror', dev: 'dev', controls: 'controls', system: 'system', studio: 'studio', software: 'software' };
+  const PAGE_APP = { monitor: 'claude', spotify: 'spotify', chat: 'buddy', focus: 'focus', tray: 'tray', clips: 'clips', note: 'note', mirror: 'mirror', dev: 'dev', controls: 'controls', system: 'system', studio: 'studio', software: 'software', dashboard: 'dashboard', rules: 'rules', remote: 'remote' };
   const pages = () => { const off = window.__winlandAppsOff?.() || new Set(); return ALL_PAGES.filter(pg => !off.has(PAGE_APP[pg.view])); };
   const pageIndex = () => pages().findIndex(pg => pg.view === (currentView === 'assistant' ? 'monitor' : currentView));
   function go(view) {
@@ -192,24 +195,26 @@
     // bottom middle: the pages as icons, always visible; the page you are on shows its name in a soft capsule in its colour
     const n = pages().length, label = pg => en() ? pg.en : pg.nl;
     ctx.save(); ctx.font = '600 11px Inter, "Segoe UI", sans-serif';
-    const want = pages().map((pg, j) => 30 + (j === i ? ctx.measureText(label(pg)).width + 10 : 0)); ctx.restore();
+    const extra = i >= 0 ? ctx.measureText(label(pages()[i])).width + 10 : 0, room = right - left - 150; // the volume on the right, a margin on the left
+    const unit = Math.max(20, Math.min(30, Math.floor((room - extra - (n - 1) * 2) / Math.max(1, n))));
+    const want = pages().map((pg, j) => unit + (j === i ? extra : 0)); ctx.restore();
     if (!nav.widths || nav.widths.length !== n) nav.widths = want.slice();
     nav.widths = nav.widths.map((w, j) => w + (want[j] - w) * 0.25); // the capsule glides to the new page
     const rowW = nav.widths.reduce((sum, w) => sum + w, 0) + (n - 1) * 2, cx = (left + right) / 2 - 10;
     let x = cx - rowW / 2, tipAt = null;
     pages().forEach((pg, j) => {
       const w = nav.widths[j], b = { x, y: by - 14, width: w, height: 28 }, over = inside(pointer.x, pointer.y, b), on = j === i;
-      const tint = typeof pg.tint === 'function' ? pg.tint() : pg.tint, ix = x + 15;
+      const tint = typeof pg.tint === 'function' ? pg.tint() : pg.tint, ix = x + unit / 2;
       if (on) { ctx.save(); const n2 = /rgba?\((\d+),\s*(\d+),\s*(\d+)/.exec(tint); const hex = n2 ? null : parseInt(tint.slice(1), 16);
         ctx.fillStyle = tint === '#ffffff' ? '#2c2c2e' : n2 ? `rgba(${n2[1]},${n2[2]},${n2[3]},.2)` : `rgba(${hex >> 16},${(hex >> 8) & 255},${hex & 255},.2)`;
         ctx.beginPath(); ctx.roundRect(x, by - 13, w, 26, 13); ctx.fill(); ctx.restore(); }
       else if (over) round(ix, by, 13, '#2c2c2e');
       pageIcon(pg, ix, by, 15, on ? tint : over ? '#ffffff' : '#8e8e93');
-      if (on && w > 40) { ctx.save(); ctx.globalAlpha *= Math.min(1, (w - 40) / 20); text(label(pg), x + 28, by + 4, 11, tint, 600); ctx.restore(); }
+      if (on && w > unit + 10) { ctx.save(); ctx.globalAlpha *= Math.min(1, (w - unit - 10) / 20); text(label(pg), x + unit - 2, by + 4, 11, tint, 600); ctx.restore(); }
       if (over && !on) tipAt = { x: ix, label: label(pg) };
       hit['navTab' + j] = b; x += w + 2;
     });
-    for (let j = n; j < 10; j++) hit['navTab' + j] = null;
+    for (let j = n; j < 24; j++) hit['navTab' + j] = null;
     // the label above the tab you point at (where you will go)
     if (tipAt && mode === 'expanded') { tip.textContent = tipAt.label; tip.style.left = `${tipAt.x}px`; tip.style.top = `${by - 18}px`; tip.classList.add('on'); }
     else tip.classList.remove('on');

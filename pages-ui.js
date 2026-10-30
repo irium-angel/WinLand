@@ -38,7 +38,7 @@
   // Spotify is a wide, low player (like NotchNook); the other pages need more height.
   // every page only as tall as it needs (like the Dynamic Island: tight around its content)
   const HEIGHTS = { spotify: 184, focus: 254, tray: 178, clips: 262, note: 250, chat: 300, apps: 246, mirror: 280, settings: 320, dev: 300, controls: 300, system: 230, studio: 272, software: 252, palette: 286, rules: 300, dashboard: 300, remote: 262 };
-  targetHeight = function () { return HEIGHTS[currentView] || (PAGE.isPage(currentView) ? PAGE.height : baseHeight()); };
+  targetHeight = function () { if (currentView === 'apps' && window.__winlandAppRows?.() === 3) return 300; /* more than 14 apps: a third row */ return HEIGHTS[currentView] || (PAGE.isPage(currentView) ? PAGE.height : baseHeight()); };
 
   // Smooth page changes (this replaced blob-ui.js): opening the island blurs the content in, going to another page slides it in from that side.
   let lastView = null, changedAt = 0, lastMode = null, slideDir = 0, opening = false;
