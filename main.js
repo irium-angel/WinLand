@@ -15,6 +15,10 @@ require('./settings-app-main.cjs'); // WinLand Instellingen: settings as their o
 require('./license-main.cjs'); // which apps are open (all of them: everything is local and free)
 require('./ai-account-main.cjs'); // Codex sign-in for Pip's chat (the local Codex program) and Pip himself
 require('./media-main.cjs');
+require('./palette-main.cjs');
+require('./queue-main.cjs');
+require('./remote-main.cjs');
+require('./companion-main.cjs'); // Pip on the desktop // the phone remote, on your Wi-Fi only (off until you turn it on) // Claude dashboard: tasks Claude Code does one after another // command palette: Alt+Space
 require('./software-main.cjs'); // Software page: FL Studio, VS Code, Steam, Word… only the ones on this PC
 require('./dev-main.cjs'); // Dev page: Git, local servers, dev programs (all read on this PC) // what plays in any music app (Spotify, Apple Music, Deezer…)
 
@@ -50,7 +54,7 @@ function positionMascot() {
 
 
   const display =
-    screen.getPrimaryDisplay();
+    islandDisplay();
 
 
   const x =
@@ -348,24 +352,49 @@ function createMascot() {
 // OTHER IPC
 // ============================================================
 
+// The screen of the island: the primary one, or with "follow the mouse" on (live-ui.js) the one the mouse is on.
+let followMouse = false, followTimer = null, followDisplay = null;
+function islandDisplay() { return followMouse && followDisplay ? followDisplay : screen.getPrimaryDisplay(); }
+ipcMain.on('island:follow', (event, on) => {
+  if (!mascotWindow || event.sender !== mascotWindow.webContents) return;
+  followMouse = Boolean(on); clearInterval(followTimer); followTimer = null;
+  if (!followMouse) { followDisplay = null; positionMascot(); return; }
+  followTimer = setInterval(() => {
+    const d = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
+    if (d.id !== followDisplay?.id) { followDisplay = d; positionMascot(); }
+  }, 400);
+});
+// A notification, a reminder: over a big window the island comes out for a moment (not during a game)
+ipcMain.on('island:reveal', (event, ms) => {
+  if (!mascotWindow || event.sender !== mascotWindow.webContents || presence !== 'peek') return;
+  revealed = true; revealedAt = Date.now() + Math.max(0, Math.min(30000, Number(ms) || 0)) - 900; awayAt = 0; showIsland(); raiseIsland(); raisedAt = Date.now();
+});
+
 // Where the island stands (winland-fun.js decides, from the window in front):
 //   normal  always there;  hidden  a game fills the screen: gone (and it draws nothing)
 //   peek    a maximized or full-screen window: gone, back while the mouse is at the top edge or on the island
 let presence = 'normal', revealed = false, revealedAt = 0, awayAt = 0, peekTimer = null;
 function showIsland() { if (mascotWindow && !mascotWindow.isDestroyed() && !mascotWindow.isVisible()) mascotWindow.showInactive(); }
 function hideIsland() { if (mascotWindow && !mascotWindow.isDestroyed() && mascotWindow.isVisible()) mascotWindow.hide(); }
+// Full-screen players, slideshows and some apps are "always on top" themselves: the island goes above them.
+function raiseIsland() { if (!mascotWindow || mascotWindow.isDestroyed()) return; mascotWindow.setAlwaysOnTop(true, 'screen-saver'); mascotWindow.moveTop(); }
+let raisedAt = 0;
 function peekTick() {
   if (!mascotWindow || mascotWindow.isDestroyed()) return;
-  const cursor = screen.getCursorScreenPoint(), area = screen.getPrimaryDisplay().bounds, now = Date.now();
-  const atTop = cursor.y <= area.y + 2 && Math.abs(cursor.x - (area.x + area.width / 2)) <= 240;
-  if (!revealed) { if (atTop) { revealed = true; revealedAt = now; awayAt = 0; showIsland(); } return; }
-  // the island catches the mouse while you point at it (setMascotInteractive): away from it for a moment = hide again
-  if (atTop || mascotInteractive || now - revealedAt < 900) { awayAt = 0; return; }
+  const cursor = screen.getCursorScreenPoint(), area = islandDisplay().bounds, now = Date.now();
+  const atTop = cursor.y <= area.y + 3 && Math.abs(cursor.x - (area.x + area.width / 2)) <= 420;
+  if (!revealed) { if (atTop) { revealed = true; revealedAt = now; awayAt = 0; showIsland(); raiseIsland(); raisedAt = now; } return; }
+  if (now - raisedAt > 400) { raiseIsland(); raisedAt = now; } // stay above a window that grabs the top again
+  // on the island (its window, where it catches the mouse) or at the top edge: stay; away for a moment: hide again.
+  // The window's own area counts, so the island never stays stuck when it missed the mouse leaving.
+  const b = mascotWindow.getBounds(), onIt = cursor.x >= b.x && cursor.x <= b.x + b.width && cursor.y >= b.y && cursor.y <= b.y + b.height;
+  if (atTop || (onIt && mascotInteractive) || mascotWindow.isFocused() || now - revealedAt < 900) { awayAt = 0; return; } // typing in it (palette, chat): stay
   if (!awayAt) awayAt = now;
   if (now - awayAt > 450) { revealed = false; hideIsland(); }
 }
 function applyPresence() {
   clearInterval(peekTimer); peekTimer = null; revealed = false;
+  if (mascotWindow && !mascotWindow.isDestroyed()) mascotWindow.setAlwaysOnTop(true, 'floating'); // the usual level again
   if (presence === 'normal') showIsland();
   else hideIsland();
   if (presence === 'peek') peekTimer = setInterval(peekTick, 50);

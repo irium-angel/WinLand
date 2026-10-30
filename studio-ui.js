@@ -27,11 +27,29 @@
 #winland-studio .st-lane u{position:absolute;top:0;bottom:0;width:2px;background:#fff}
 #winland-studio .st-db{display:flex;justify-content:space-between;font-size:11px;color:#8e8e93;font-variant-numeric:tabular-nums}
 #winland-studio .st-clip{align-self:flex-start;font-size:11px;font-weight:700;padding:3px 8px;border-radius:6px;background:#2c2c2e;color:#8e8e93}
-#winland-studio .st-clip.on{background:#ff453a;color:#fff}`;
+#winland-studio .st-clip.on{background:#ff453a;color:#fff}
+#winland-studio .st-page{height:100%;display:flex;flex-direction:column;gap:10px}
+#winland-studio .st-tabs{display:flex;gap:6px;flex:none}
+#winland-studio .st-tabs button{height:28px;padding:0 12px;border-radius:9px;font-size:12px!important;font-weight:600!important;color:#a1a1ab}
+#winland-studio .st-tabs button.on{background:#fff;color:#000}
+#winland-studio .st-body{flex:1;min-height:0}
+#winland-studio .st-big{display:flex;align-items:center;justify-content:center;gap:26px;height:100%}
+#winland-studio .st-note{font-size:64px;font-weight:800;letter-spacing:-2px;min-width:110px;text-align:center}
+#winland-studio .st-note small{font-size:24px;color:#8e8e93;letter-spacing:0}
+#winland-studio .st-cents{width:280px}
+#winland-studio .st-scale{position:relative;height:14px;border-radius:7px;background:#1c1c1e}
+#winland-studio .st-scale i{position:absolute;top:-4px;width:6px;height:22px;border-radius:3px;background:#30d158;transition:left .12s}
+#winland-studio .st-scale u{position:absolute;left:50%;top:-6px;width:2px;height:26px;background:#fff;opacity:.5}
+#winland-studio .st-sub{color:#8e8e93;font-size:12px;margin-top:8px;text-align:center}
+#winland-studio .st-memos{display:flex;flex-direction:column;gap:4px;min-width:280px;max-height:150px;overflow:auto}
+#winland-studio .st-memo{display:flex;align-items:center;justify-content:space-between;gap:10px;height:30px;padding:0 10px;border-radius:9px;background:#1c1c1e;font-size:12px}
+#winland-studio .st-rec{width:72px;height:72px;border-radius:50%!important;background:#ff453a!important;font-size:13px!important;font-weight:700!important}
+#winland-studio .st-rec.on{animation:st-pulse 1s infinite}
+@keyframes st-pulse{50%{box-shadow:0 0 0 10px rgba(255,69,58,.25)}}`;
   document.head.appendChild(style);
   const WORDS = {
-    fr: { metro: 'Métronome', tap: 'Taper', start: 'Démarrer', stop: 'Arrêter', beats: 'temps', level: 'Niveau de sortie', peak: 'crête', rms: 'moyen', quiet: 'Rien ne joue', clip: 'SATURATION' },
-    en: { metro: 'Metronome', tap: 'Tap', start: 'Start', stop: 'Stop', beats: 'beats', level: 'Output level', peak: 'peak', rms: 'average', quiet: 'Nothing playing', clip: 'CLIP' }
+    fr: { tuner: 'Accordeur', memos: 'Notes vocales', metro: 'Métronome', tap: 'Taper', start: 'Démarrer', stop: 'Arrêter', beats: 'temps', level: 'Niveau de sortie', peak: 'crête', rms: 'moyen', quiet: 'Rien ne joue', clip: 'SATURATION' },
+    en: { tuner: 'Tuner', memos: 'Voice notes', metro: 'Metronome', tap: 'Tap', start: 'Start', stop: 'Stop', beats: 'beats', level: 'Output level', peak: 'peak', rms: 'average', quiet: 'Nothing playing', clip: 'CLIP' }
   };
   const L = () => WORDS[window.__winlandPrefs?.().lang === 'en' ? 'en' : 'fr'];
   const store = { get: (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } }, set: (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} } };
@@ -79,20 +97,24 @@
     root.querySelector('.st-clip').classList.toggle('on', now - clipAt < 1500);
   }
 
-  let lastKey = '';
+  let lastKey = '', tab = 'metro'; // metronome · tuner · BPM of what plays · voice notes (studio-tools-ui.js)
   function render(force) {
     if (currentView !== 'studio') return;
-    const w = L(), key = [bpm, perBar, on, w.metro].join('|');
+    const w = L(), key = [bpm, perBar, on, w.metro, tab].join('|');
     if (!force && key === lastKey) return; lastKey = key;
-    root.innerHTML = `<div class="st-wrap"><div class="st-box"><small>${w.metro}</small>
+    const tabs = `<div class="st-tabs">${[['metro', w.metro], ['tuner', w.tuner], ['bpm', 'BPM'], ['memo', w.memos]].map(([id, label]) => `<button type="button" data-tab="${id}" class="${tab === id ? 'on' : ''}">${label}</button>`).join('')}</div>`;
+    if (tab !== 'metro') { root.innerHTML = `<div class="st-page">${tabs}<div class="st-body">${window.__winlandStudioTools?.html(tab) || ''}</div></div>`; window.__winlandStudioTools?.mounted(tab, root); return; }
+    root.innerHTML = `<div class="st-page">${tabs}<div class="st-body"><div class="st-wrap"><div class="st-box"><small>${w.metro}</small>
       <div class="st-bpm"><button type="button" data-bpm="-1">−</button><b>${bpm}</b><button type="button" data-bpm="1">+</button><span style="color:#8e8e93;font-size:12px">BPM</span></div>
       <div class="st-beats">${Array.from({ length: perBar }, (_, i) => `<i class="${i === 0 ? 'first' : ''}"></i>`).join('')}</div>
       <div class="st-row"><button type="button" class="st-go ${on ? 'on' : ''}" data-go="1">${on ? w.stop : w.start}</button><button type="button" data-tap="1">${w.tap}</button><button type="button" data-per="1">${perBar} ${w.beats}</button></div></div>
-      <div class="st-box"><small>${w.level}</small><div class="st-meter"><div class="st-lane"><i></i><u></u></div><div class="st-lane"><i></i></div><div class="st-db"></div></div><span class="st-clip">${w.clip}</span></div></div>`;
+      <div class="st-box"><small>${w.level}</small><div class="st-meter"><div class="st-lane"><i></i><u></u></div><div class="st-lane"><i></i></div><div class="st-db"></div></div><span class="st-clip">${w.clip}</span></div></div></div></div>`;
     paintBeats();
   }
   root.addEventListener('click', e => {
     const b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.tab) { const before = tab; tab = b.dataset.tab; if (before !== tab) window.__winlandStudioTools?.left(before); render(true); return; }
+    if (window.__winlandStudioTools?.click(b, tab)) return;
     if (b.dataset.bpm) setBpm(bpm + Number(b.dataset.bpm) * (e.shiftKey ? 10 : 1));
     if (b.dataset.go) on ? stop() : start();
     if (b.dataset.tap) tap();
@@ -104,9 +126,10 @@
     const show = currentView === 'studio' && mode === 'expanded' && visual.width > 500 && visual.height > Math.min(targetHeight() - 30, 150);
     const display = show ? 'block' : 'none'; if (root.style.display !== display) root.style.display = display;
     if (show) { window.__winlandPage.place(root, contentRect()); if (!shown) { shown = true; render(true); meterTimer = setInterval(paintMeter, 50); } }
-    else if (shown) { shown = false; clearInterval(meterTimer); }
+    else if (shown) { shown = false; clearInterval(meterTimer); window.__winlandStudioTools?.left(tab); }
     requestAnimationFrame(position);
   })();
+  window.__winlandStudioBpm = v => setBpm(v); // the BPM tool can hand its tempo to the metronome
   window.__winlandStudioStatus = () => on ? `♩ ${bpm} BPM` : `${bpm} BPM`;
   window.__winlandStudioOpen = () => shown;
   canvas.addEventListener('click', e => { if (inside(e.clientX, e.clientY, hit.studioApp)) { e.preventDefault(); e.stopImmediatePropagation(); setView('studio'); } }, true);

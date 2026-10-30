@@ -1903,7 +1903,7 @@
     lower(on ? T(`nog ${mins} min`, `${mins} min left`) : T('Klaar om te starten', 'Ready to start'), x + pad, y + s - 15, s - pad * 2);
   }
   // The other apps as a home tile: their colour glowing from the bottom, the icon top right, a big line and a small one.
-  const TILE_COLOUR = { software: '#0a84ff', mirror: '#8e8e93', system: '#30d158', studio: '#bf5af2', controls: '#ff9f0a', dev: '#64d2ff', note: '#ffd166', clips: '#5ad1c4', tray: '#ffd60a', clock: '#8ab4ff', chat: '#30d158' };
+  const TILE_COLOUR = { dashboard: '#d97757', rules: '#ffd60a', remote: '#30d158', software: '#0a84ff', mirror: '#8e8e93', system: '#30d158', studio: '#bf5af2', controls: '#ff9f0a', dev: '#64d2ff', note: '#ffd166', clips: '#5ad1c4', tray: '#ffd60a', clock: '#8ab4ff', chat: '#30d158' };
   function appTile(id, x, y, s) {
     const a = APPS[id], pad = 14, colour = TILE_COLOUR[id] || '#8e8e93';
     widget(x, y, s, a.key, colour, false);
@@ -2144,6 +2144,9 @@
     { id: 'system', key: 'systemApp', icon: 'system', nl: 'Systeem', en: 'System', c: '#ffffff' },
     { id: 'studio', key: 'studioApp', icon: 'studio', nl: 'Studio', en: 'Studio', c: '#ffffff' },
     { id: 'software', key: 'softwareApp', icon: 'software', nl: 'Programma\'s', en: 'Software', c: '#ffffff' },
+    { id: 'dashboard', key: 'dashboardApp', icon: 'chart', nl: 'Dashboard', en: 'Dashboard', c: '#ffffff' },
+    { id: 'rules', key: 'rulesApp', icon: 'bolt', nl: 'Automatisaties', en: 'Automations', c: '#ffffff' },
+    { id: 'remote', key: 'remoteApp', icon: 'phone', nl: 'Telefoon', en: 'Phone', c: '#ffffff' },
     { id: 'mirror', key: 'mirrorApp', icon: 'camera', nl: 'Spiegel', en: 'Mirror', c: '#ffffff' },
     { id: 'settings', key: 'settingsApp', icon: 'gear', nl: 'Instellingen', en: 'Settings', c: '#ffffff' }
   ];
@@ -2201,7 +2204,10 @@
     system: { icon: 'system', label: 'Systeem', key: 'systemApp', tint: () => '#30d158' },
     mirror: { icon: 'camera', label: 'Spiegel', key: 'mirrorApp', tint: () => '#8e8e93' },
     studio: { icon: 'studio', label: 'Studio', key: 'studioApp', tint: () => '#bf5af2' },
-    software: { icon: 'software', label: 'Programma\'s', key: 'softwareApp', tint: () => '#0a84ff' }
+    software: { icon: 'software', label: 'Programma\'s', key: 'softwareApp', tint: () => '#0a84ff' },
+    dashboard: { icon: 'chart', label: 'Dashboard', key: 'dashboardApp', tint: () => '#d97757' },
+    rules: { icon: 'bolt', label: 'Automatisaties', key: 'rulesApp', tint: () => '#ffd60a' },
+    remote: { icon: 'phone', label: 'Telefoon', key: 'remoteApp', tint: () => '#30d158' }
   };
   const APP_OF_KEY = Object.fromEntries(Object.entries(APPS).map(([id, a]) => [a.key, id]));
   const MAX_SHORTCUTS = 4, DEFAULT_SHORTCUTS = ['spotify', 'focus', 'tray', 'settings'];
@@ -2223,12 +2229,15 @@
     if (id === 'system') return window.__winlandSystemStatus?.() || T('Processor, grafische kaart', 'Processor, graphics card');
     if (id === 'studio') return window.__winlandStudioStatus?.() || 'BPM';
     if (id === 'software') return window.__winlandSoftwareStatus?.() || T('Je programma\'s', 'Your software');
+    if (id === 'dashboard') return T('Sessies en wachtrij', 'Sessions and queue');
+    if (id === 'rules') return T('Als dit, dan dat', 'When this, then that');
+    if (id === 'remote') return T('Op je wifi', 'On your Wi-Fi');
     if (id === 'controls') return window.__winlandOutputName?.() || T('Geluid, vergrendelen', 'Sound, lock');
     if (id === 'clock') return new Date().toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' });
     return 'Kleuren, geluid';
   }
   // The + page: pick the four quick buttons on your home screen (tap an app to put it on or take it off).
-  const QUICK_CHOICES = ['focus', 'tray', 'clips', 'note', 'chat', 'dev', 'controls', 'system', 'studio', 'software', 'mirror', 'settings'];
+  const QUICK_CHOICES = ['focus', 'tray', 'clips', 'note', 'chat', 'dev', 'controls', 'system', 'studio', 'software', 'dashboard', 'rules', 'remote', 'mirror', 'settings'];
   function drawShortcuts(area) {
     const x = area.x, w = area.width, list = shortcuts().filter(id => QUICK_CHOICES.includes(id)), en = EN();
     big(T('Snelknoppen', 'Quick buttons'), x + 8, area.y + 26, 22, '#fff', 600);

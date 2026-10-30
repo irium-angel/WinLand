@@ -5,6 +5,9 @@
 // terminal, WinLand is closed, or the wait ended). Usage: bun winland-reply.cjs <token>
 const http = require('node:http');
 
+// A task of WinLand's queue (queue-main.cjs) runs without a window: nobody answers it from the island, let it end.
+if (process.env.WINLAND_QUEUE) process.exit(0);
+
 let input = '';
 process.stdin.setEncoding('utf8');
 process.stdin.on('data', chunk => { input += chunk; });

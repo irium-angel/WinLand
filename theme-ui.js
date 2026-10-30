@@ -51,7 +51,7 @@
 
   // DOM pages: the same flip as a filter (pictures are flipped back)
   const PAGES = ['#winland-ai-monitor', '#winland-ai-monitor-status', '#winland-chat', '#winland-extras', '#winland-focus', '#winland-menu',
-    '#winland-tip', '#winland-tools', '#winland-dev', '#winland-controls', '#winland-system', '#winland-studio', '#winland-software', '#winland-project-v2', '#winland-settings-v2'].join(',');
+    '#winland-tip', '#winland-tools', '#winland-dev', '#winland-controls', '#winland-system', '#winland-studio', '#winland-software', '#winland-palette', '#winland-rules', '#winland-dashboard', '#winland-remote', '#winland-project-v2', '#winland-settings-v2'].join(',');
   const style = document.createElement('style');
   style.textContent = `html.tc-light :is(${PAGES}){filter:invert(1) hue-rotate(180deg)}
 html.tc-light :is(${PAGES}) :is(img,video,canvas){filter:invert(1) hue-rotate(180deg)}`;

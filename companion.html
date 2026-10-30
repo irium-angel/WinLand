@@ -1,0 +1,80 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'">
+<title>Pip</title>
+<!-- Pip on the desktop (companion-main.cjs). Walks, climbs onto the window in front, falls, sleeps, looks at the mouse. -->
+<style>html,body{margin:0;width:100%;height:100%;overflow:hidden;background:transparent}canvas{display:block}</style>
+</head><body><canvas id="c"></canvas>
+<script>
+const cv = document.getElementById('c'), ctx = cv.getContext('2d');
+const dpr = devicePixelRatio || 1;
+function fit() { cv.width = innerWidth * dpr; cv.height = innerHeight * dpr; cv.style.width = innerWidth + 'px'; cv.style.height = innerHeight + 'px'; }
+fit(); addEventListener('resize', fit);
+const W = 46, H = 40; // Pip's size on the desktop
+let world = { floor: innerHeight - 48, left: 0, right: innerWidth, shelf: null, mouse: { x: 0, y: 0 }, idle: 0 };
+const pip = { x: innerWidth / 2, y: -60, vx: 0, vy: 0, dir: 1, ground: null, state: 'fall', until: 0, step: 0, blinkAt: 0, over: false };
+window.pipBridge.onWorld(w => { world = w; });
+
+const now = () => performance.now();
+const surfaces = () => { const s = [{ y: world.floor, x1: world.left, x2: world.right, kind: 'floor' }];
+  if (world.shelf && world.shelf.y > 60 && world.shelf.y < world.floor - 80) s.push({ y: world.shelf.y, x1: world.shelf.x + 10, x2: world.shelf.x + world.shelf.width - 10, kind: 'shelf' });
+  return s; };
+function choose() { // what next: walk, sit, climb onto the window, sleep
+  const t = now(), r = Math.random(), shelf = surfaces().find(s => s.kind === 'shelf');
+  if (world.idle > 120) { pip.state = 'sleep'; pip.until = t + 4000; return; }
+  if (shelf && pip.ground === 'floor' && r < 0.35 && Math.abs((shelf.x1 + shelf.x2) / 2 - pip.x) < innerWidth) { // jump up onto the window in front
+    pip.state = 'jump'; const tx = Math.min(shelf.x2 - W, Math.max(shelf.x1, pip.x + (Math.random() - 0.5) * 300));
+    const dy = world.floor - shelf.y, vy = -Math.sqrt(2 * 1800 * (dy + 50)); pip.vy = vy; pip.vx = (tx - pip.x) / (-2 * vy / 1800); pip.ground = null; return; }
+  if (r < 0.6) { pip.state = 'walk'; pip.dir = Math.random() < 0.5 ? -1 : 1; pip.until = t + 2000 + Math.random() * 4000; return; }
+  pip.state = 'sit'; pip.until = t + 1500 + Math.random() * 3000;
+}
+let last = now();
+function tick() {
+  const t = now(), dt = Math.min(0.05, (t - last) / 1000); last = t;
+  const ground = surfaces();
+  if (pip.ground) { // the surface under him went away (window closed or moved): fall
+    const g = ground.find(s => s.kind === pip.ground);
+    if (!g || pip.x + W / 2 < g.x1 || pip.x + W / 2 > g.x2 || Math.abs(g.y - pip.y) > 6) { pip.ground = null; pip.state = 'fall'; pip.vy = 0; }
+    else pip.y = g.y;
+  }
+  if (!pip.ground) { // in the air
+    pip.vy += 1800 * dt; pip.x += pip.vx * dt; const ny = pip.y + pip.vy * dt;
+    const land = pip.vy > 0 && ground.find(s => pip.y <= s.y + 1 && ny >= s.y && pip.x + W / 2 >= s.x1 && pip.x + W / 2 <= s.x2);
+    if (land) { pip.y = land.y; pip.vy = 0; pip.vx = 0; pip.ground = land.kind; pip.state = 'land'; pip.until = t + 300; } else pip.y = ny;
+    if (pip.y > innerHeight + 100) { pip.y = -60; pip.x = innerWidth / 2; }
+  } else if (pip.state === 'walk') {
+    const g = ground.find(s => s.kind === pip.ground); pip.x += pip.dir * 70 * dt; pip.step += dt * 9;
+    if (pip.x < g.x1) { pip.x = g.x1; pip.dir = 1; } if (pip.x > g.x2 - W) { pip.x = g.x2 - W; pip.dir = -1; }
+    if (t > pip.until) choose();
+  } else if (pip.state === 'sleep') { if (world.idle < 3) choose(); }
+  else if (t > pip.until) choose();
+  draw(t); requestAnimationFrame(tick);
+}
+function draw(t) {
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, innerWidth, innerHeight);
+  const sleeping = pip.state === 'sleep', squash = pip.state === 'land' ? 0.85 : 1, bob = pip.state === 'walk' ? Math.abs(Math.sin(pip.step)) * 3 : sleeping ? Math.sin(t / 600) * 1 : 0;
+  const x = pip.x, base = pip.y, w = W * (2 - squash), h = H * squash, y = base - h - bob - 6;
+  // shadow, little feet, body
+  ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(x + W / 2, base - 1, W * 0.45, 3, 0, 0, Math.PI * 2); ctx.fill();
+  const lift = pip.state === 'walk' ? Math.sin(pip.step) * 3 : 0;
+  ctx.fillStyle = '#d4d4dc'; for (const [fx, l] of [[x + W * 0.28, lift], [x + W * 0.62, -lift]]) { ctx.beginPath(); ctx.roundRect(fx, base - 7 - Math.max(0, l), 7, 6, 3); ctx.fill(); }
+  ctx.save(); ctx.shadowColor = 'rgba(0,0,0,.3)'; ctx.shadowBlur = 8; ctx.shadowOffsetY = 3;
+  const g = ctx.createLinearGradient(0, y, 0, y + h); g.addColorStop(0, '#fff'); g.addColorStop(1, '#dedee6');
+  ctx.fillStyle = g; ctx.beginPath(); ctx.roundRect(x + (W - w) / 2, y, w, h, 13); ctx.fill(); ctx.restore();
+  // eyes: look at the mouse, blink, closed when asleep
+  const cx = x + W / 2, cy = y + h * 0.48, dx = world.mouse.x - cx, dy = world.mouse.y - cy, d = Math.hypot(dx, dy) || 1;
+  const lx = sleeping ? 0 : dx / d * 3, ly = sleeping ? 2 : dy / d * 2.5;
+  if (t > pip.blinkAt + 4200) pip.blinkAt = t; const blink = t - pip.blinkAt < 130;
+  ctx.fillStyle = '#1c1c1e';
+  for (const s of [-1, 1]) { const ex = cx + s * 8 + lx, ey = cy + ly;
+    if (sleeping || blink) { ctx.fillRect(ex - 3.5, ey, 7, 2); } else { ctx.beginPath(); ctx.roundRect(ex - 3, ey - 5, 6, 10, 3); ctx.fill(); } }
+  if (sleeping) { ctx.fillStyle = 'rgba(255,255,255,.85)'; ctx.font = '600 11px Segoe UI, sans-serif';
+    for (let i = 0; i < 3; i++) { const k = ((t / 1400) + i / 3) % 1; ctx.globalAlpha = 1 - k; ctx.fillText('z', cx + 14 + k * 10, y - 4 - k * 20); } ctx.globalAlpha = 1; }
+  // the mouse over Pip: he catches clicks (everything else goes through to your apps)
+  const over = world.mouse.x > x - 4 && world.mouse.x < x + W + 4 && world.mouse.y > y - 6 && world.mouse.y < base + 4;
+  if (over !== pip.over) { pip.over = over; window.pipBridge.hover(over); }
+}
+addEventListener('mousedown', () => { if (pip.over) window.pipBridge.home(); });
+requestAnimationFrame(tick);
+</script>
+</body></html>

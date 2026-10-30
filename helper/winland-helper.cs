@@ -15,9 +15,15 @@ using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
+using Windows.ApplicationModel.Appointments;
 using Windows.Foundation;
+using Windows.Graphics.Imaging;
 using Windows.Media.Control;
+using Windows.Media.Ocr;
+using Windows.Storage;
 using Windows.Storage.Streams;
+using Windows.UI.Notifications;
+using Windows.UI.Notifications.Management;
 
 namespace WinLand {
   // What the window in front means for the island (main screen only):
@@ -79,7 +85,9 @@ namespace WinLand {
       bool zoomed = IsZoomed(h);
       bool full = r.Left <= info.Monitor.Left && r.Top <= info.Monitor.Top && r.Right >= info.Monitor.Right && r.Bottom >= info.Monitor.Bottom;
       if (!zoomed && !full) return exclusive ? "game" : "none";
-      if (full && !zoomed && (exclusive || IsGame(ExePath(pid)))) return "game";
+      // A game: a known game in full screen. Windows also says "Direct3D full screen" for videos and browsers in
+      // full screen, so that alone is not enough: those are "cover" and the island comes back with the mouse.
+      if (full && !zoomed && IsGame(ExePath(pid))) return "game";
       return "cover";
     }
   }
@@ -118,6 +126,16 @@ namespace WinLand {
       if (percent > 0) v.SetMute(false, Guid.Empty);
     }
     public static void Mute(bool on) { Endpoint().SetMute(on, Guid.Empty); }
+    // the default microphone (for calls and for everything else): cut or open it for the whole PC
+    static IAudioEndpointVolume Mic(int role) {
+      var enumerator = (IMMDeviceEnumerator)(new MMDeviceEnumerator());
+      IMMDevice device; Marshal.ThrowExceptionForHR(enumerator.GetDefaultAudioEndpoint(1, role, out device));
+      IAudioEndpointVolume volume; var id = typeof(IAudioEndpointVolume).GUID;
+      Marshal.ThrowExceptionForHR(device.Activate(ref id, 23, 0, out volume));
+      return volume;
+    }
+    public static void MicMute(bool on) { foreach (int role in new[] { 0, 2 }) { try { Mic(role).SetMute(on, Guid.Empty); } catch { } } }
+    public static string MicMuted() { try { bool m; Mic(0).GetMute(out m); return m ? "1" : "0"; } catch { return "-"; } }
     // Commands from WinLand come in on stdin, on their own thread (the main loop keeps reporting changes).
     public static void Listen() {
       var thread = new System.Threading.Thread(() => {
@@ -421,6 +439,94 @@ namespace WinLand {
   }
 
   // ---------- volume + the window in front (was volume-watch.ps1) ----------
+  // ---------- small tools asked by WinLand: OCR of a picture, the colour under the mouse, the app in front ----------
+  static class Tools {
+    [DllImport("user32.dll")] static extern bool GetCursorPos(out POINT p);
+    [DllImport("user32.dll")] static extern IntPtr GetDC(IntPtr h);
+    [DllImport("user32.dll")] static extern int ReleaseDC(IntPtr h, IntPtr dc);
+    [DllImport("gdi32.dll")] static extern uint GetPixel(IntPtr dc, int x, int y);
+    [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
+    [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr h, out uint pid);
+    struct POINT { public int X, Y; }
+    struct BOX { public int Left, Top, Right, Bottom; }
+    [DllImport("user32.dll")] static extern bool GetWindowRect(IntPtr h, out BOX r);
+    [DllImport("user32.dll")] static extern bool IsIconic(IntPtr h);
+    [DllImport("user32.dll")] static extern bool IsZoomed(IntPtr h);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetClassName(IntPtr h, StringBuilder name, int size);
+    // where the window in front is (Pip on the desktop sits on it): "x y width height", or "-" for none / maximized
+    public static string FrontRect(int skipPid) {
+      var h = GetForegroundWindow(); if (h == IntPtr.Zero || IsIconic(h) || IsZoomed(h)) return "-";
+      var c = new StringBuilder(64); GetClassName(h, c, 64); var cls = c.ToString();
+      if (cls == "Progman" || cls == "WorkerW" || cls == "Shell_TrayWnd") return "-";
+      uint pid; GetWindowThreadProcessId(h, out pid); if (pid == skipPid) return "-";
+      BOX r; if (!GetWindowRect(h, out r) || r.Right - r.Left < 200) return "-";
+      return r.Left + " " + r.Top + " " + (r.Right - r.Left) + " " + (r.Bottom - r.Top);
+    }
+    public static T Wait<T>(IAsyncOperation<T> op) { while (op.Status == AsyncStatus.Started) Thread.Sleep(15); if (op.Status != AsyncStatus.Completed) throw new Exception(op.ErrorCode != null ? op.ErrorCode.Message : "failed"); return op.GetResults(); }
+    // the text in a picture (Windows' own OCR, in the languages of this PC)
+    public static string Ocr(string path) {
+      var engine = OcrEngine.TryCreateFromUserProfileLanguages();
+      if (engine == null) return "{\"ok\":false,\"error\":\"no-language\"}";
+      var file = Wait(StorageFile.GetFileFromPathAsync(path));
+      using (var stream = Wait(file.OpenAsync(FileAccessMode.Read))) {
+        var decoder = Wait(BitmapDecoder.CreateAsync(stream));
+        var bitmap = Wait(decoder.GetSoftwareBitmapAsync(BitmapPixelFormat.Bgra8, BitmapAlphaMode.Premultiplied));
+        var result = Wait(engine.RecognizeAsync(bitmap));
+        var text = new StringBuilder(); foreach (var line in result.Lines) text.Append(line.Text).Append('\n');
+        return "{\"ok\":true,\"text\":" + J.S(text.ToString().TrimEnd()) + "}";
+      }
+    }
+    // today's appointments of the Windows calendar (Outlook, Google… accounts added to Windows), read on this PC
+    public static string Agenda() {
+      var store = Wait(AppointmentManager.RequestStoreAsync(AppointmentStoreAccessType.AllCalendarsReadOnly));
+      var list = Wait(store.FindAppointmentsAsync(DateTimeOffset.Now.Date, TimeSpan.FromDays(1)));
+      var b = new StringBuilder("["); bool first = true;
+      foreach (var a in list) {
+        if (!first) b.Append(','); first = false;
+        b.Append("{\"start\":").Append(J.N(a.StartTime.ToUnixTimeMilliseconds())).Append(",\"minutes\":").Append(J.N(a.Duration.TotalMinutes))
+         .Append(",\"title\":").Append(J.S(a.Subject)).Append(",\"place\":").Append(J.S(a.Location)).Append(",\"allDay\":").Append(J.B(a.AllDay)).Append('}');
+      }
+      return b.Append(']').ToString();
+    }
+    // the colour under the mouse, as #rrggbb
+    public static string Pixel() {
+      POINT p; GetCursorPos(out p); var dc = GetDC(IntPtr.Zero); uint c = GetPixel(dc, p.X, p.Y); ReleaseDC(IntPtr.Zero, dc);
+      return string.Format("#{0:x2}{1:x2}{2:x2} {3} {4}", c & 0xff, (c >> 8) & 0xff, (c >> 16) & 0xff, p.X, p.Y);
+    }
+    // the program in front (its file name), for the screen time
+    public static string Front() {
+      try { uint pid; GetWindowThreadProcessId(GetForegroundWindow(), out pid); if (pid == 0) return ""; return Process.GetProcessById((int)pid).ProcessName; } catch { return ""; }
+    }
+  }
+
+  // ---------- Windows notifications (Discord, Outlook, Teams…): each new one, once ----------
+  static class Notify {
+    public static void Run() {
+      var thread = new Thread(() => {
+        var seen = new System.Collections.Generic.HashSet<uint>(); bool first = true;
+        UserNotificationListener l;
+        try { l = UserNotificationListener.Current; if (Tools.Wait(l.RequestAccessAsync()) != UserNotificationListenerAccessStatus.Allowed) { Program.Say("notif-access denied"); return; } }
+        catch { Program.Say("notif-access denied"); return; }
+        Program.Say("notif-access allowed");
+        while (true) {
+          try {
+            foreach (var n in Tools.Wait(l.GetNotificationsAsync(NotificationKinds.Toast))) {
+              if (!seen.Add(n.Id) || first) continue;
+              string app = ""; try { app = n.AppInfo.DisplayInfo.DisplayName; } catch { }
+              var texts = new System.Collections.Generic.List<string>();
+              try { var b = n.Notification.Visual.GetBinding(KnownNotificationBindings.ToastGeneric); if (b != null) foreach (var t in b.GetTextElements()) texts.Add(t.Text); } catch { }
+              if (texts.Count == 0) continue;
+              Program.Say("notif {\"id\":" + n.Id + ",\"app\":" + J.S(app) + ",\"title\":" + J.S(texts[0]) + ",\"body\":" + J.S(string.Join("\n", texts.GetRange(1, texts.Count - 1))) + "}");
+            }
+            first = false;
+          } catch { }
+          Thread.Sleep(1500);
+        }
+      });
+      thread.IsBackground = true; thread.Start();
+    }
+  }
+
   static class Watch {
     public static void Run(int parent) {
       var listen = new Thread(() => {
@@ -433,11 +539,17 @@ namespace WinLand {
             else if (parts[0] == "outputs") Program.Say("outputs " + Outputs.List());
             else if (parts[0] == "gpu") Program.Say("gpu " + Gpu.Read());
             else if (parts.Length == 2 && parts[0] == "output") { Outputs.Use(parts[1]); Program.Say("outputs " + Outputs.List()); }
+            else if (parts.Length == 2 && parts[0] == "micmute") { Audio.MicMute(parts[1] == "1"); Program.Say("micmute " + Audio.MicMuted()); }
+            else if (parts[0] == "pixel") Program.Say("pixel " + Tools.Pixel());
+            else if (parts.Length == 2 && parts[0] == "rect") Program.Say("rect " + Tools.FrontRect(int.Parse(parts[1])));
+            else if (parts[0] == "agenda") { string a; try { a = Tools.Agenda(); } catch { a = "[]"; } Program.Say("agenda " + a); }
+            else if (parts.Length == 2 && parts[0] == "ocr") { string r; try { r = Tools.Ocr(Encoding.UTF8.GetString(Convert.FromBase64String(parts[1]))); } catch (Exception e) { r = "{\"ok\":false,\"error\":" + J.S(e.Message) + "}"; } Program.Say("ocr " + r); }
           } catch { }
         }
       });
       listen.IsBackground = true; listen.Start();
-      string last = "", lastMode = "", lastMic = null, lastCam = null; int tick = 0;
+      Notify.Run();
+      string last = "", lastMode = "", lastMic = null, lastCam = null, lastMicMute = null, lastFront = null; int tick = 0;
       while (true) {
         tick++;
         if (parent > 0 && tick % 15 == 0) { try { Process.GetProcessById(parent); } catch { return; } } // stop together with WinLand
@@ -448,6 +560,8 @@ namespace WinLand {
         if (tick % 6 == 0) { // about once a second: microphone and camera
           try { var mic = Privacy.InUse("microphone"); if (mic != lastMic) { Program.Say("mic " + mic); lastMic = mic; } } catch { }
           try { var cam = Privacy.InUse("webcam"); if (cam != lastCam) { Program.Say("cam " + cam); lastCam = cam; } } catch { }
+          var mm = Audio.MicMuted(); if (mm != lastMicMute) { Program.Say("micmute " + mm); lastMicMute = mm; }
+          var front = Tools.Front(); if (front != lastFront) { Program.Say("front " + front); lastFront = front; }
         }
         Thread.Sleep(150);
       }

@@ -80,6 +80,46 @@
     // the window in front (none / cover / game) and what the island does about it (main.js island:presence)
     onForeground: callback => subscribe('extras:foreground', callback),
     onPrivacy: callback => subscribe('extras:privacy', callback), // apps using the microphone / camera
+    onNotif: callback => subscribe('extras:notif', callback), // a Windows notification (live-ui.js)
+    onMicMute: callback => subscribe('extras:micmute', callback), // the PC's microphone cut or open
+    onMicKey: callback => subscribe('extras:mic-key', callback), // Ctrl+Alt+M was pressed
+    micGet: () => ipcRenderer.invoke('extras:mic-get'),
+    micSet: muted => ipcRenderer.invoke('extras:mic-set', { muted: Boolean(muted) }),
+    pixel: () => ipcRenderer.invoke('extras:pixel'), // the colour under the mouse
+    onFront: callback => subscribe('extras:front', callback), // the program in front changed (automations)
+    idleTime: () => ipcRenderer.invoke('extras:idle'),
+    agenda: () => ipcRenderer.invoke('extras:agenda'), // today's appointments of the Windows calendar
+    ocr: (filePath, copy) => ipcRenderer.invoke('extras:ocr', { path: String(filePath || ''), copy: Boolean(copy) }),
+    screenTime: () => ipcRenderer.invoke('extras:screen-time'),
+    studioMemoSave: base64 => ipcRenderer.invoke('studio:memo-save', { data: String(base64 || '') }), // voice notes (studio-tools-ui.js)
+    studioMemos: () => ipcRenderer.invoke('studio:memos'),
+    studioMemoOpen: name => ipcRenderer.invoke('studio:memo-open', { name: String(name || '') }),
+    openCopied: text => ipcRenderer.invoke('extras:open-copied', { text: String(text || '') }), // a copied link or path (smart clipboard)
+    revealFor: ms => ipcRenderer.send('island:reveal', Number(ms) || 0), // over a big window, come out for a moment
+    followMouse: on => ipcRenderer.send('island:follow', Boolean(on)),
+    // command palette (palette-main.cjs, palette-ui.js)
+    onPaletteShow: callback => subscribe('palette:show', callback),
+    paletteIndex: () => ipcRenderer.invoke('palette:index'),
+    paletteOpen: (kind, id) => ipcRenderer.invoke('palette:open', { kind: String(kind), id: Number(id) }),
+    paletteClaude: (prompt, project) => ipcRenderer.invoke('palette:claude', { prompt: String(prompt || ''), project: Number(project) }),
+    palettePort: (port, kill) => ipcRenderer.invoke('palette:port', { port: Number(port), kill: Boolean(kill) }),
+    paletteScriptsFolder: () => ipcRenderer.invoke('palette:scripts-folder'),
+    // Claude dashboard: the task queue (queue-main.cjs)
+    queueGet: () => ipcRenderer.invoke('queue:get'),
+    queueAdd: (prompt, project) => ipcRenderer.invoke('queue:add', { prompt: String(prompt || ''), project: String(project || '') }),
+    queueRemove: id => ipcRenderer.invoke('queue:remove', { id: String(id || '') }),
+    queueClear: () => ipcRenderer.invoke('queue:clear'),
+    queueProjects: () => ipcRenderer.invoke('queue:projects'),
+    onQueueUpdate: callback => subscribe('queue:update', callback),
+    onQueueFinished: callback => subscribe('queue:finished', callback),
+    // the phone remote, on your Wi-Fi (remote-main.cjs)
+    remoteInfo: () => ipcRenderer.invoke('remote:info'),
+    remoteSet: on => ipcRenderer.invoke('remote:set', { on: Boolean(on) }),
+    remoteNewKey: () => ipcRenderer.invoke('remote:new-key'),
+    remoteState: state => ipcRenderer.send('remote:state', state),
+    onRemoteDo: callback => subscribe('remote:do', callback),
+    pipDesk: on => ipcRenderer.invoke('pip:desk', Boolean(on)), // Pip on the desktop (companion-main.cjs)
+    onPipHome: callback => subscribe('pip:home', callback),
     privacyGet: () => ipcRenderer.invoke('extras:privacy-get'),
     onNewFile: callback => subscribe('extras:new-file', callback), // a new screenshot or a finished download
     // Controls page (controls-ui.js)

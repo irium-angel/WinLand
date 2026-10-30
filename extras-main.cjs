@@ -61,6 +61,68 @@ function setup(electron) {
     setTimeout(() => { const i = outputWaiters.indexOf(done); if (i >= 0) { outputWaiters.splice(i, 1); done([]); } }, 3000); // the PowerShell fallback has no outputs
   });
   handle('extras:outputs', async () => ({ outputs: await askOutputs('outputs') }));
+  // ---------- notifications, the microphone for the whole PC, OCR and the colour picker (winland-helper) ----------
+  let notifAccess = '', micMuted = false;
+  const answers = { pixel: [], ocr: [], agenda: [], rect: [] };
+  const ask = (kind, line, wait = 8000) => new Promise(done => {
+    if (!volumeChild?.stdin) return done(null);
+    answers[kind].push(done); volumeChild.stdin.write(line + '\n');
+    setTimeout(() => { const i = answers[kind].indexOf(done); if (i >= 0) { answers[kind].splice(i, 1); done(null); } }, wait);
+  });
+  app.winlandFrontRect = async skipPid => { const r = await ask('rect', 'rect ' + (Number(skipPid) || 0), 1500); const n = String(r || '-').split(' ').map(Number); return n.length === 4 && n.every(Number.isFinite) ? { x: n[0], y: n[1], width: n[2], height: n[3] } : null; }; // Pip on the desktop
+  const setMic = on => { volumeChild?.stdin?.write('micmute ' + (on ? '1' : '0') + '\n'); };
+  handle('extras:mic-get', async () => ({ muted: micMuted, notifications: notifAccess }));
+  handle('extras:mic-set', async payload => { setMic(Boolean(payload?.muted)); return {}; });
+  handle('extras:idle', async () => ({ seconds: electron.powerMonitor.getSystemIdleTime() })); // how long nobody touched the PC (automations)
+  handle('extras:agenda', async () => { let list = []; try { list = JSON.parse(await ask('agenda', 'agenda', 8000)); } catch {} return { list: Array.isArray(list) ? list : [] }; }); // the Windows calendar, today
+  handle('extras:pixel', async () => { const r = await ask('pixel', 'pixel', 3000); const [hex] = String(r || '').split(' '); return { hex: /^#[0-9a-f]{6}$/.test(hex) ? hex : '' }; });
+  // the text in a picture (a screenshot): Windows' own OCR, on this PC
+  handle('extras:ocr', async payload => {
+    const file = String(payload?.path || '');
+    if (!path.isAbsolute(file) || !fs.existsSync(file) || !/\.(png|jpe?g|bmp)$/i.test(file)) throw new Error('image');
+    const r = await ask('ocr', 'ocr ' + Buffer.from(file, 'utf8').toString('base64'), 15000);
+    let out = { ok: false }; try { out = JSON.parse(r); } catch {}
+    if (out.ok && out.text && payload?.copy) { electron.clipboard.writeText(out.text); }
+    return { text: out.ok ? out.text || '' : '', error: out.ok ? '' : out.error || 'ocr' };
+  });
+  // ---------- screen time: how long each program was in front today (kept on this PC, 14 days) ----------
+  const screenTime = (() => {
+    const day = () => new Date().toISOString().slice(0, 10);
+    let data = readJson('screen-time.json', {}), current = '', since = Date.now(), dirty = false;
+    const add = () => {
+      const now = Date.now(), d = day(); if (current && !/^(LockApp|explorer|ShellExperienceHost|SearchHost|StartMenuExperienceHost)$/i.test(current)) {
+        (data[d] ||= {})[current] = ((data[d] || {})[current] || 0) + Math.min(now - since, 120000); dirty = true; }
+      since = now;
+    };
+    const tick = setInterval(() => { add(); if (dirty) { const keep = Object.keys(data).sort().slice(-14); data = Object.fromEntries(keep.map(k => [k, data[k]])); writeJson('screen-time.json', data); dirty = false; } }, 60000); tick.unref?.();
+    return { front: name => { add(); current = name; }, today: () => { add(); return data[day()] || {}; } };
+  })();
+  // a link or a path you copied (smart clipboard): a web link in the browser, a file or folder that exists
+  handle('extras:open-copied', async payload => {
+    const t = String(payload?.text || '').trim();
+    if (/^https?:\/\/\S+$/i.test(t)) { await shell.openExternal(t); return {}; }
+    const p = t.replace(/^~(?=[\\/])/, app.getPath('home'));
+    if (!path.isAbsolute(p) || !fs.existsSync(p)) throw new Error('missing');
+    const problem = await shell.openPath(p); if (problem) throw new Error(problem); return {};
+  });
+  // ---------- voice notes (Studio page): Music\WinLand ----------
+  const memoDir = () => path.join(app.getPath('music'), 'WinLand');
+  handle('studio:memo-save', async payload => {
+    const data = Buffer.from(String(payload?.data || ''), 'base64'); if (!data.length || data.length > 200 * 1024 * 1024) throw new Error('empty');
+    fs.mkdirSync(memoDir(), { recursive: true });
+    const d = new Date(), p2 = n => String(n).padStart(2, '0');
+    const name = `Note vocale ${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())} ${p2(d.getHours())}h${p2(d.getMinutes())}${p2(d.getSeconds())}.webm`;
+    fs.writeFileSync(path.join(memoDir(), name), data); return { name };
+  });
+  handle('studio:memos', async () => {
+    let list = []; try { list = fs.readdirSync(memoDir()).filter(f => /\.(webm|wav|mp3|m4a|ogg)$/i.test(f)).map(f => ({ name: f, at: fs.statSync(path.join(memoDir(), f)).mtimeMs })); } catch {}
+    return { memos: list.sort((a, b) => b.at - a.at).slice(0, 8) };
+  });
+  handle('studio:memo-open', async payload => { // a note (only a file of that folder), or the folder itself
+    const name = path.basename(String(payload?.name || '')), p = name ? path.join(memoDir(), name) : memoDir();
+    fs.mkdirSync(memoDir(), { recursive: true }); const problem = await shell.openPath(p); if (problem) throw new Error(problem); return {};
+  });
+  handle('extras:screen-time', async () => ({ today: Object.entries(screenTime.today()).sort((a, b) => b[1] - a[1]).slice(0, 12).map(([app, ms]) => ({ app, ms })) }));
   // ---------- System page: processor, graphics card (winland-helper) and memory ----------
   const os = require('node:os');
   const gpuWaiters = [];
@@ -139,6 +201,11 @@ function setup(electron) {
         if (level === 'outputs') { let list = []; try { list = JSON.parse(muted); } catch {} outputWaiters.splice(0).forEach(done => done(list)); continue; }
         if (level === 'mic' || level === 'cam') { privacy[level] = (muted || '').split('|').filter(Boolean); send('extras:privacy', privacy); continue; } // who uses them
         if (level === 'fg') { foreground = muted; send('extras:foreground', foreground); continue; } // the window in front: none / cover / game
+        if (level === 'notif') { try { send('extras:notif', JSON.parse(muted)); } catch {} continue; } // a Windows notification (Discord, Outlook…)
+        if (level === 'notif-access') { notifAccess = muted; continue; }
+        if (level === 'micmute') { micMuted = muted === '1'; send('extras:micmute', { muted: micMuted, known: muted !== '-' }); continue; }
+        if (level === 'front') { screenTime.front(muted); send('extras:front', muted); continue; } // the program in front (screen time, automations)
+        if (level === 'pixel' || level === 'ocr' || level === 'agenda' || level === 'rect') { answers[level].splice(0).forEach(done => done(muted)); continue; }
         if (level !== undefined && level !== '') { volumeNow = { level: Number(level), muted: muted === '1' }; send('extras:volume', volumeNow); }
       }
     });
@@ -187,11 +254,12 @@ Get-PnpDevice -Class Bluetooth -Status OK -ErrorAction SilentlyContinue | ForEac
 
   // ---------- keyboard shortcuts: Ctrl+Alt+1..6 jump straight to a screen ----------
   const SHORTCUTS = { 1: 'home', 2: 'spotify', 3: 'claude', 4: 'focus', 5: 'clips', 6: 'note' };
-  app.on('will-quit', () => { try { for (const n of Object.keys(SHORTCUTS)) electron.globalShortcut.unregister('CommandOrControl+Alt+' + n); } catch {} });
+  app.on('will-quit', () => { try { for (const n of [...Object.keys(SHORTCUTS), 'M']) electron.globalShortcut.unregister('CommandOrControl+Alt+' + n); } catch {} });
 
   app.whenReady().then(() => {
     const poll = setInterval(() => { readClipboard().catch(() => {}); }, 1000); poll.unref?.();
     for (const [n, view] of Object.entries(SHORTCUTS)) { try { electron.globalShortcut.register('CommandOrControl+Alt+' + n, () => send('extras:shortcut', view)); } catch {} }
+    try { electron.globalShortcut.register('CommandOrControl+Alt+M', () => { setMic(!micMuted); send('extras:mic-key', { muted: !micMuted }); }); } catch {}
     // Real sound wave: the island may listen to what the PC plays (Windows "loopback" audio).
     // Only volume levels are measured in the island itself; nothing is recorded or sent anywhere.
     const { session, desktopCapturer } = electron;

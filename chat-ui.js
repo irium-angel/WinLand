@@ -367,6 +367,7 @@
   // While Pip thinks, a soft rainbow light runs round the edge of the island (like Siri); it fades out when he answers.
   let shineUntil = 0, ring = 0;
   window.__winlandChatShine = () => { shineUntil = performance.now() + 4000; };
+  window.__winlandChatAsk = text => { setView('chat'); setMode('expanded'); ask('free', String(text || '').slice(0, 2000)); };
   const RAINBOW = ['#ff6b9d', '#ffb86b', '#ffe56b', '#6bffb5', '#6bc5ff', '#a07bff', '#ff6b9d'];
   const bigRobo = () => currentView === 'chat' && mode === 'expanded' && visible && !messages.length && !waiting;
   window.__winlandRoboBig = bigRobo; // the header leaves its own little eyes out then (there is only one Pip)

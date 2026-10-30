@@ -11,6 +11,11 @@
 #winland-dev *{box-sizing:border-box}
 #winland-dev button{border:0;background:transparent;color:#fff;font:inherit;padding:0;cursor:pointer}
 #winland-dev .dv-list{height:100%;overflow:auto;scrollbar-width:none;padding:0 2px 6px}
+#winland-dev .dv-tools{display:flex;gap:8px;align-items:center;margin-bottom:6px}
+#winland-dev .dv-tools button,#winland-dev .dv-tools input{height:30px;border-radius:9px;border:0;background:#1c1c1e;color:#fff;font:600 12px Inter,"Segoe UI",sans-serif;padding:0 11px}
+#winland-dev .dv-tools input{width:86px;outline:0;font-weight:500}
+#winland-dev .dv-tools button:hover{background:#2c2c2e}
+#winland-dev .dv-last{flex:1;min-width:0;text-align:right;font-size:11px;color:#8e8e93;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #winland-dev h4{margin:8px 0 4px;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:#8e8e93;font-weight:600;display:flex;align-items:center;gap:8px}
 #winland-dev h4:first-child{margin-top:0}
 #winland-dev h4 button{margin-left:auto;color:#64d2ff;font-size:11px;text-transform:none;letter-spacing:0;font-weight:600}
@@ -66,19 +71,34 @@
     const portRows = ports.map(p => `<div class="dv-row"><span class="dv-port">:${p.port}</span><div class="dv-main"><b>${esc(p.name)}</b><small>PID ${p.pid} · ${p.local ? w.local : w.network}</small></div>
       <button type="button" class="dv-stop ${sure === p.pid ? 'sure' : ''}" data-stop="${p.pid}">${sure === p.pid ? w.sure : w.stop}</button></div>`).join('');
     const runRows = running.map(r => `<div class="dv-row"><div class="dv-main"><b>${esc(r.name)}</b><small>PID ${r.pid}${r.since ? ' · ' + dur(Date.now() - r.since) : ''}</small></div><div class="dv-tags"><span class="dv-tag">${r.memMb} Mo</span></div></div>`).join('');
-    const html = `<div class="dv-list"><h4>${w.projects}<button type="button" data-add="1">${w.add}</button></h4>${gitRows || `<div class="dv-none">${w.noGit}</div>`}
+    // tools: the colour under the mouse, free a port, and the last long command that finished
+    const last = lastRun ? `${T('Dernière commande', 'Last command')} : ${esc(lastRun.name)} · ${dur(lastRun.ms)} · ${w.ago(Date.now() - lastRun.at)}` : '';
+    const tools = `<div class="dv-tools"><button type="button" data-pick="1">💧 ${T('Pipette', 'Eyedropper')}</button><input type="text" inputmode="numeric" maxlength="5" placeholder="${T('Port', 'Port')}" data-port-in="1"><button type="button" data-port="1">🔌 ${T('Libérer', 'Free')}</button><span class="dv-last">${last}</span></div>`;
+    const html = `<div class="dv-list">${tools}<h4>${w.projects}<button type="button" data-add="1">${w.add}</button></h4>${gitRows || `<div class="dv-none">${w.noGit}</div>`}
       <h4>${w.servers}</h4>${portRows || `<div class="dv-none">${w.noServers}</div>`}
       <h4>${w.running}</h4>${runRows || `<div class="dv-none">${w.noRunning}</div>`}
       ${dk.installed ? `<h4>${w.docker}</h4>${!dk.running ? `<div class="dv-none">${w.dockerOff}</div>` : dockerRows || `<div class="dv-none">${w.noContainers}</div>`}` : ''}</div>`;
     if (html === lastHtml) return;
     const top = root.querySelector('.dv-list')?.scrollTop || 0;
+    const typed = root.querySelector('[data-port-in]')?.value || '', focused = document.activeElement?.dataset?.portIn;
     root.innerHTML = html; lastHtml = html;
+    const portIn = root.querySelector('[data-port-in]'); if (portIn) { portIn.value = typed; if (focused) portIn.focus(); }
     const list = root.querySelector('.dv-list'); if (list) list.scrollTop = top;
   }
   root.addEventListener('click', async e => {
     const add = e.target.closest('[data-add]'), stop = e.target.closest('[data-stop]'), forget = e.target.closest('[data-forget]');
     const code = e.target.closest('[data-code]'), dstop = e.target.closest('[data-dstop]'), dstart = e.target.closest('[data-dstart]');
     if (code) { sound('click'); api.devOpenCode(code.dataset.code); return; }
+    if (e.target.closest('[data-pick]')) { sound('click'); window.__winlandFlash?.(`💧 ${T('Place la souris sur la couleur…', 'Point at the colour…')}`, 3000);
+      setTimeout(async () => { const r = await api.pixel().catch(() => null); if (r?.hex) { navigator.clipboard?.writeText(r.hex).catch(() => {}); window.__winlandCard?.({ app: T('Pipette', 'Eyedropper'), icon: ' ', colour: r.hex, title: r.hex, body: T('Copié dans le presse-papiers', 'Copied to the clipboard'), ms: 5000 }); } }, 3000); return; }
+    if (e.target.closest('[data-port]')) {
+      const port = Number(root.querySelector('[data-port-in]')?.value); if (!port) return; sound('click');
+      const who = await api.palettePort(port, false).catch(() => null);
+      if (who?.free) { window.__winlandFlash?.(`✅ ${T('Le port', 'Port')} ${port} ${T('est libre', 'is free')}`, 2200); return; }
+      if (portSure !== port) { portSure = port; window.__winlandFlash?.(`🔌 ${who?.name || '?'} ${T('utilise le port', 'uses port')} ${port} · ${T('reclique pour l’arrêter', 'click again to stop it')}`, 3000); setTimeout(() => { if (portSure === port) portSure = null; }, 3500); return; }
+      portSure = null; const k = await api.palettePort(port, true).catch(() => null);
+      window.__winlandFlash?.(k?.killed ? `🔌 ${T('Port', 'Port')} ${port} ${T('libéré', 'freed')}` : `⚠ ${T('Programme Windows : laissé tranquille', 'A Windows program: left alone')}`, 2400); setTimeout(load, 600); return;
+    }
     if (dstart) { sound('click'); await api.devDocker(dstart.dataset.dstart, 'start').catch(() => {}); load(); return; }
     if (dstop) { // asks twice, like the servers
       const id = dstop.dataset.dstop;
@@ -98,7 +118,11 @@
   window.__winlandDevStatus = () => L().status(data?.git?.[0]);
 
   // ---- a dev program that ran a while has finished (Settings → "Prévenir quand un programme de dev se termine") ----
+  let portSure = null, lastRun = (() => { try { return JSON.parse(localStorage.getItem('winland:last-run')); } catch { return null; } })();
+  const T = (fr, en) => window.__winlandPrefs?.().lang === 'en' ? en : fr;
   api.onDevFinished?.(({ name, ms }) => {
+    lastRun = { name, ms, at: Date.now() }; try { localStorage.setItem('winland:last-run', JSON.stringify(lastRun)); } catch {} lastHtml = ''; render();
+    window.__winlandAutomation?.('command-done', { name, ms });
     if (!window.__winlandPrefs?.().devWatch) return;
     const line = L().done(name, dur(ms));
     window.__winlandFlash?.('✓ ' + line, 2600); window.__winlandChime?.('done'); window.__winlandSay?.(L().finished, line);

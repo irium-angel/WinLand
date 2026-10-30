@@ -14,6 +14,8 @@
 #winland-tools .tl-list{height:100%;overflow:auto;scrollbar-width:none;padding:2px 2px 0}
 #winland-tools .tl-row{display:flex;align-items:center;gap:14px;width:100%;height:48px;text-align:left;border-radius:12px;padding:0 8px;margin:0 -8px;width:calc(100% + 16px)}
 #winland-tools .tl-row:hover{background:#1c1c1e}
+#winland-tools .tl-act{flex:none;height:26px;padding:0 10px;border-radius:13px;background:#0a84ff;color:#fff;font:600 12px Inter,sans-serif;display:grid;place-items:center}
+#winland-tools .tl-act:hover{filter:brightness(1.15)}
 #winland-tools .tl-row:active{transform:scale(.99);transition:transform .1s ease-out}
 #winland-tools .tl-ic{flex:none;width:30px;height:30px;border-radius:7px;display:grid;place-items:center;background:var(--k)}
 #winland-tools .tl-txt{flex:1;min-width:0;height:48px;display:flex;align-items:center;gap:10px;border-bottom:1px solid #2c2c2e}
@@ -80,10 +82,10 @@
         if (/^(https?:\/\/|www\.)\S+$/i.test(t) || /^[\w-]+(\.[\w-]+)+(\/\S*)?$/.test(t)) return ['link', '#2c2c2e'];
         if (/[{};]\s*$|=>|^\s*(git|npm|npx|cd|const|let|function|import|def|class|SELECT|<\w+)\b|^\$ /m.test(t)) return ['code', '#2c2c2e'];
         return ['text', '#2c2c2e']; };
-      const row = (c, i) => { const [kind, colour] = kindOf(c.text), t = c.text.trim(), hex = t.replace(/^(?=[0-9a-f]{6}$)/i, '#');
+      const row = (c, i) => { const [kind, colour] = kindOf(c.text), t = c.text.trim(), hex = t.replace(/^(?=[0-9a-f]{6}$)/i, '#'), act = window.__winlandSmartClip?.(c.text);
         const ic = kind === 'colour' ? `<span class="tl-ic" style="--k:${esc(hex)};box-shadow:inset 0 0 0 1px rgba(255,255,255,.2)"></span>`
           : `<span class="tl-ic" style="--k:${colour}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">${G[kind]}</svg></span>`;
-        return `<button class="tl-row" data-i="${i}">${ic}<span class="tl-txt"><b class="${kind === 'code' || kind === 'colour' ? 'mono' : ''}">${esc(t.replace(/\s+/g, ' '))}</b><small class="${i === copied ? 'ok' : ''}">${i === copied ? esc(window.__winlandTr?.('Gekopieerd ✓') ?? 'Gekopieerd ✓') : esc(ago(c.at))}</small></span></button>`; };
+        return `<button class="tl-row" data-i="${i}">${ic}<span class="tl-txt"><b class="${kind === 'code' || kind === 'colour' ? 'mono' : ''}">${esc(t.replace(/\s+/g, ' '))}</b><small class="${i === copied ? 'ok' : ''}">${i === copied ? esc(window.__winlandTr?.('Gekopieerd ✓') ?? 'Gekopieerd ✓') : esc(ago(c.at))}</small>${act ? `<span class="tl-act" data-act="${i}">${esc(act.label)}</span>` : ''}</span></button>`; };
       root.innerHTML = clips.length
         ? `<div class="tl-list">${clips.map(row).join('')}<button class="tl-clear" data-clear="1">${T('Wis geschiedenis', 'Clear history')}</button></div>`
         : `<div class="tl-empty"><b>${T('Nog niks gekopieerd', 'Nothing copied yet')}</b><span>${T('Kopieer iets (Ctrl + C), dan staat het hier.', 'Copy something (Ctrl + C) and it shows up here.')}</span></div>`;
@@ -122,6 +124,8 @@
       api.noteSet(note).then(() => { savedAt = Date.now(); }); root.innerHTML = noteView(); sound('click'); return;
     }
     if (e.target.closest('[data-edit]')) { editNote(); return; }
+    const act = e.target.closest('[data-act]');
+    if (act) { const c = clips[Number(act.dataset.act)]; window.__winlandSmartClip?.(c?.text)?.run(); sound('click'); return; }
     const clip = e.target.closest('[data-i]');
     if (clip) { api.clipsCopy(Number(clip.dataset.i)).then(r => { if (r.ok) { clips = r.clips; copied = 0; render(true); sound('click'); setTimeout(() => { copied = -1; render(true); }, 1400); } }); return; }
     if (e.target.closest('[data-clear]')) api.clipsClear().then(r => { if (r.ok) { clips = []; render(true); } });

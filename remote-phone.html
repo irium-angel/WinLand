@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#08080c"><title>WinLand</title>
+<!-- WinLand on your phone (remote-main.cjs serves it on your Wi-Fi). The key comes from the QR code (#k=…) and stays on this phone. -->
+<style>
+  *{box-sizing:border-box;margin:0}
+  body{background:#08080c;color:#f5f5f7;font:16px/1.4 -apple-system,"SF Pro Text","Segoe UI",Roboto,sans-serif;padding:max(18px,env(safe-area-inset-top)) 16px 30px;min-height:100vh}
+  header{display:flex;align-items:center;gap:12px;margin-bottom:18px}
+  .pip{width:46px;height:40px;border-radius:14px;background:linear-gradient(#fff,#dedee6);position:relative;flex:none}
+  .pip i{position:absolute;top:12px;width:8px;height:14px;border-radius:5px;background:var(--e,#1c1c1e);transition:background .3s}
+  .pip i:first-child{left:13px}.pip i:last-child{right:13px}
+  h1{font-size:22px;letter-spacing:-.4px}h1 small{display:block;font-size:13px;color:#8e8e93;font-weight:500;letter-spacing:0}
+  .card{background:#16161b;border-radius:20px;padding:16px;margin-bottom:12px}
+  .card small{display:block;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:#8e8e93;font-weight:600;margin-bottom:8px}
+  .card b{display:block;font-size:18px}.card p{color:#a1a1ab;font-size:14px;margin-top:4px;word-break:break-word}
+  .row{display:flex;gap:10px;margin-top:12px}
+  button{flex:1;height:50px;border:0;border-radius:14px;background:#2c2c2e;color:#fff;font:600 16px inherit;font-family:inherit}
+  button:active{transform:scale(.97)}
+  .ok{background:#30d158}.no{background:#ff453a}.main{background:linear-gradient(135deg,#7c5cff,#1aa7ff)}
+  .lamp{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:8px;background:#636366;vertical-align:1px}
+  .err{color:#ff9f0a;text-align:center;margin-top:30px}
+</style></head>
+<body>
+<header><div class="pip" id="pip"><i></i><i></i></div><h1>WinLand<small id="sub">…</small></h1></header>
+<div id="app"></div>
+<script>
+const KEY = (() => { const m = /[#&]k=([0-9a-f]{32})/.exec(location.hash); if (m) { try { localStorage.setItem('winland-key', m[1]); } catch {} history.replaceState(null, '', location.pathname); return m[1]; } try { return localStorage.getItem('winland-key') || ''; } catch { return ''; } })();
+const fr = !/^en/i.test(navigator.language || '');
+const T = (a, b) => fr ? a : b;
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+const COLOURS = { running: '#ff9f0a', question: '#ff9f0a', done: '#30d158', error: '#ff453a' };
+const STATES = { running: T('Claude travaille…', 'Claude is working…'), question: T('Claude attend ta réponse', 'Claude is waiting for you'), done: T('Claude a fini', 'Claude is done'), error: T('Erreur', 'Error'), ready: T('Prêt', 'Ready') };
+let last = null;
+async function call(path, body) {
+  const r = await fetch(path, { method: body ? 'POST' : 'GET', headers: { 'X-WinLand-Key': KEY, 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined, cache: 'no-store' });
+  if (r.status === 403) throw new Error('key'); return r.json();
+}
+const act = (kind, extra = {}) => call('/api/do', { kind, ...extra }).then(() => setTimeout(load, 500)).catch(() => {});
+function draw(s) {
+  const app = document.getElementById('app'), c = s.claude || {}, m = s.music || {}, f = s.focus || {};
+  document.getElementById('pip').style.setProperty('--e', COLOURS[c.state] || '#1c1c1e');
+  document.getElementById('sub').textContent = T('Connecté à ton PC', 'Connected to your PC');
+  const ask = c.permission ? `<div class="card"><small>${T('Claude demande', 'Claude asks')}</small><b>${esc(c.permission)}</b>${c.permissionDetail ? `<p>${esc(c.permissionDetail)}</p>` : ''}
+      <div class="row"><button class="ok" data-a="allow">${T('Autoriser', 'Allow')}</button><button class="no" data-a="deny">${T('Refuser', 'Deny')}</button></div></div>` : '';
+  app.innerHTML = `${ask}
+    <div class="card"><small>Claude Code</small><b><span class="lamp" style="background:${COLOURS[c.state] || '#636366'}"></span>${esc(STATES[c.state] || T('Rien en cours', 'Nothing running'))}</b>${c.project ? `<p>${esc(c.project)}${c.detail ? ' · ' + esc(c.detail) : ''}</p>` : ''}${c.question ? `<p>${esc(c.question)}</p>` : ''}</div>
+    <div class="card"><small>${T('Musique', 'Music')}</small><b>${esc(m.title || T('Rien ne joue', 'Nothing playing'))}</b>${m.artist ? `<p>${esc(m.artist)}</p>` : ''}
+      <div class="row"><button data-a="previous">⏮</button><button class="main" data-a="${m.playing ? 'pause' : 'play'}">${m.playing ? '⏸' : '▶'}</button><button data-a="next">⏭</button></div></div>
+    <div class="card"><small>Focus</small><b>${f.active ? esc(f.label) : T('Pas de focus en cours', 'No focus running')}</b><div class="row"><button data-a="focus">${f.active ? T('Arrêter', 'Stop') : T('Lancer un focus', 'Start a focus')}</button><button data-a="mic" class="${s.micMuted ? 'no' : ''}">${s.micMuted ? T('🎙 Micro coupé', '🎙 Mic off') : T('🎙 Couper le micro', '🎙 Mute mic')}</button></div></div>`;
+  last = s;
+}
+document.addEventListener('click', e => { const b = e.target.closest('[data-a]'); if (!b) return; const a = b.dataset.a; act(a, a === 'allow' || a === 'deny' ? { sessionId: last?.claude?.sessionId } : {}); if (navigator.vibrate) navigator.vibrate(15); });
+async function load() {
+  if (!KEY) { document.getElementById('app').innerHTML = `<p class="err">${T('Scanne le QR code de la page Téléphone de WinLand.', 'Scan the QR code on WinLand’s Phone page.')}</p>`; return; }
+  try { draw(await call('/api/state')); }
+  catch (e) { document.getElementById('sub').textContent = e.message === 'key' ? T('Code expiré : rescanne le QR code', 'Key changed: scan the QR code again') : T('PC injoignable (même Wi-Fi ? WinLand allumé ?)', 'PC unreachable (same Wi-Fi? WinLand on?)'); }
+}
+load(); setInterval(load, 2000);
+</script>
+</body></html>

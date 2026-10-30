@@ -3,7 +3,7 @@
 // the title and a grey subtitle always at the same height, the content always starting on the same line.
 // WinLand only appears where he does something (Spotify: dancing, Lade: catching files). The other UI files use window.__winlandPage.
 (function pageLayout() {
-  const PAGES = ['apps', 'settings', 'spotify', 'monitor', 'assistant', 'tray', 'mirror', 'focus', 'clips', 'note', 'chat', 'dev', 'controls', 'system', 'studio', 'software'];
+  const PAGES = ['apps', 'settings', 'spotify', 'monitor', 'assistant', 'tray', 'mirror', 'focus', 'clips', 'note', 'chat', 'dev', 'controls', 'system', 'studio', 'software', 'palette', 'rules', 'dashboard', 'remote'];
   const PAGE = {
     height: 300,
     contentX: 24,   // left edge of titles and content: WinLand only appears on pages where he does something
@@ -37,12 +37,12 @@
   const baseHeight = targetHeight;
   // Spotify is a wide, low player (like NotchNook); the other pages need more height.
   // every page only as tall as it needs (like the Dynamic Island: tight around its content)
-  const HEIGHTS = { spotify: 184, focus: 254, tray: 178, clips: 262, note: 250, chat: 300, apps: 246, mirror: 280, settings: 320, dev: 300, controls: 300, system: 230, studio: 236, software: 252 };
+  const HEIGHTS = { spotify: 184, focus: 254, tray: 178, clips: 262, note: 250, chat: 300, apps: 246, mirror: 280, settings: 320, dev: 300, controls: 300, system: 230, studio: 272, software: 252, palette: 286, rules: 300, dashboard: 300, remote: 262 };
   targetHeight = function () { return HEIGHTS[currentView] || (PAGE.isPage(currentView) ? PAGE.height : baseHeight()); };
 
   // Smooth page changes (this replaced blob-ui.js): opening the island blurs the content in, going to another page slides it in from that side.
   let lastView = null, changedAt = 0, lastMode = null, slideDir = 0, opening = false;
-  const ROOTS = ['winland-ai-monitor', 'winland-settings-v2', 'winland-extras', 'winland-focus', 'winland-tools', 'winland-chat', 'winland-dev', 'winland-controls', 'winland-system', 'winland-studio', 'winland-software'];
+  const ROOTS = ['winland-ai-monitor', 'winland-settings-v2', 'winland-extras', 'winland-focus', 'winland-tools', 'winland-chat', 'winland-dev', 'winland-controls', 'winland-system', 'winland-studio', 'winland-software', 'winland-palette', 'winland-rules', 'winland-dashboard', 'winland-remote'];
   const shownBefore = {};
   const enter = el => { if (window.__winlandPrefs?.().appAnim === false) return; const cls = opening ? 'tc-enter' : 'tc-slide'; el.classList.remove('tc-enter', 'tc-slide'); void el.offsetWidth; el.classList.add(cls); };
   (function watch() {

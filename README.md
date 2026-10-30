@@ -15,11 +15,18 @@
 | **Répondre depuis l'island** | Quand Claude s'arrête, tu tapes ta réponse dans l'island et il reprend |
 | **Limite de 5 heures** | Un anneau montre combien de ta limite Claude tu as utilisé |
 | **Musique** | N'importe quel lecteur : Spotify, Apple Music, Deezer, TIDAL, YouTube Music dans le navigateur… Pochette, titre, lecture/pause, suivant, précédent. Aucun compte à lier |
-| **Pip** | Glisse-le sur une fenêtre et pose-lui une question (il utilise Claude Code ou Codex déjà installés sur ton PC). Humeurs, tenues, couleurs, il danse sur la musique |
+| **Pip** | Vise une fenêtre (`Ctrl+Alt+Espace`) et pose-lui une question (il utilise Claude Code ou Codex déjà installés sur ton PC). Il danse sur la musique, prend soin de toi (pause des yeux, eau, il bâille le soir) et peut se balader sur ton bureau |
 | **Petits outils** | Tiroir à fichiers, presse-papiers, note rapide, minuteur focus, volume, batterie Bluetooth |
+| **Palette de commandes** | `Alt+Espace` : une app, un fichier récent, un projet, un calcul, une conversion, « claude: … », « minuteur 5 min », « rappel 20 min … », « mode réunion », la pipette, « port 3000 », ton temps d'écran, tes scripts |
+| **Notifications et micro** | Les notifications Windows (Discord, Outlook, Teams…) arrivent dans l'island. Pendant un appel, un bouton coupe le micro de tout le PC (`Ctrl+Alt+M`) |
+| **Live** | Le texte de tes captures copié tout seul, l'agenda Windows du jour, plusieurs minuteurs et rappels, presse-papiers intelligent, modes Réunion / Nuit / Streaming |
+| **Automatisations** | Des règles « quand X, alors Y » : un jeu se lance, un casque se branche, Claude a fini pendant ton absence, il est 23 h… |
+| **Tableau de bord Claude** | Toutes tes sessions, ta consommation, et une file de tâches que Claude Code fait l'une après l'autre |
+| **Téléphone** | Ton téléphone comme télécommande sur ton Wi-Fi (QR code) : voir et autoriser Claude, musique, focus, micro |
+| **Par profil** | Logiciels installés, pipette et ports (Développement), accordeur, BPM et notes vocales (Studio) |
 | **À ton goût** | Français ou anglais, thème sombre ou clair, démarrage avec Windows (activable/désactivable) |
 
-**Raccourcis :** `Ctrl+Alt+T` ramène l'island, `Ctrl+Alt+1–6` ouvre une app.
+**Raccourcis :** `Alt+Espace` palette, `Ctrl+Alt+M` micro, `Ctrl+Alt+Espace` viser une fenêtre, `Ctrl+Alt+T` ramène l'island, `Ctrl+Alt+1–6` ouvre une app.
 Clic droit sur Pip à côté de l'horloge : ouvrir, paramètres, démarrer avec Windows, redémarrer, quitter.
 
 ## Lancer

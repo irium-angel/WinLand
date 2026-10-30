@@ -25,6 +25,9 @@
     camera(c) { c.beginPath(); c.roundRect(3, 7, 13, 10, 3); c.fill(); c.stroke(); c.beginPath(); c.moveTo(16, 11); c.lineTo(21, 8); c.lineTo(21, 16); c.lineTo(16, 13); c.closePath(); c.fill(); c.stroke(); },
     system(c) { c.beginPath(); c.roundRect(5, 5, 14, 14, 3); c.fill(); c.stroke(); c.beginPath(); for (const v of [9, 12, 15]) { c.moveTo(v, 2.5); c.lineTo(v, 5); c.moveTo(v, 19); c.lineTo(v, 21.5); c.moveTo(2.5, v); c.lineTo(5, v); c.moveTo(19, v); c.lineTo(21.5, v); } c.stroke(); c.beginPath(); c.roundRect(9, 9, 6, 6, 1); c.stroke(); },
     software(c) { for (const [x, y] of [[4, 4], [13, 4], [4, 13], [13, 13]]) { c.beginPath(); c.roundRect(x, y, 7, 7, 2); c.fill(); c.stroke(); } },
+    bolt(c) { c.beginPath(); c.moveTo(13, 3); c.lineTo(5, 13.5); c.lineTo(11.5, 13.5); c.lineTo(10.5, 21); c.lineTo(19, 10.5); c.lineTo(12.5, 10.5); c.closePath(); c.fill(); c.stroke(); },
+    phone(c) { c.beginPath(); c.roundRect(7, 3, 10, 18, 3); c.fill(); c.stroke(); c.beginPath(); c.moveTo(11, 18); c.lineTo(13, 18); c.stroke(); },
+    chart(c) { c.beginPath(); c.roundRect(4, 12, 4, 8, 1.5); c.roundRect(10, 7, 4, 13, 1.5); c.roundRect(16, 4, 4, 16, 1.5); c.fill(); c.stroke(); },
     studio(c) { c.beginPath(); c.moveTo(8, 21); c.lineTo(10.5, 4); c.lineTo(13.5, 4); c.lineTo(16, 21); c.closePath(); c.fill(); c.stroke(); c.beginPath(); c.moveTo(12, 17); c.lineTo(17.5, 7); c.stroke(); },
     controls(c) { c.beginPath(); c.roundRect(3, 5, 18, 14, 3); c.fill(); c.stroke(); c.beginPath(); c.moveTo(7, 9); c.lineTo(17, 9); c.moveTo(7, 15); c.lineTo(17, 15); c.stroke(); c.beginPath(); c.arc(10, 9, 1.8, 0, Math.PI * 2); c.arc(15, 15, 1.8, 0, Math.PI * 2); c.fill(); c.stroke(); },
     code(c) { c.beginPath(); c.roundRect(3, 5, 18, 14, 3); c.fill(); c.stroke(); c.beginPath(); c.moveTo(9.5, 9); c.lineTo(6.5, 12); c.lineTo(9.5, 15); c.moveTo(14.5, 9); c.lineTo(17.5, 12); c.lineTo(14.5, 15); c.moveTo(13, 8.5); c.lineTo(11, 15.5); c.stroke(); },
@@ -84,7 +87,7 @@
   // (point at it and it becomes a volume slider) and dots in the middle that turn into a row of tabs when you point at them. ----
   const TITLES = { chat: ['Pip', 'Pip'], spotify: ['Muziek', 'Music'], monitor: ['Claude', 'Claude'], assistant: ['Claude', 'Claude'], focus: ['Focus', 'Focus'],
     tray: ['Lade', 'Tray'], clips: ['Klembord', 'Clipboard'], note: ['Notitie', 'Note'], apps: ['Apps', 'Apps'], shortcuts: ['Snelknoppen', 'Quick buttons'],
-    settings: ['Instellingen', 'Settings'], mirror: ['Spiegel', 'Mirror'], dev: ['Dev', 'Dev'], controls: ['Bediening', 'Controls'], system: ['Systeem', 'System'], studio: ['Studio', 'Studio'], software: ['Programma\'s', 'Software'] };
+    settings: ['Instellingen', 'Settings'], mirror: ['Spiegel', 'Mirror'], dev: ['Dev', 'Dev'], controls: ['Bediening', 'Controls'], system: ['Systeem', 'System'], studio: ['Studio', 'Studio'], software: ['Programma\'s', 'Software'], palette: ['Zoeken', 'Search'], rules: ['Automatisaties', 'Automations'], dashboard: ['Claude', 'Claude'], remote: ['Telefoon', 'Phone'] };
   const en = () => window.__winlandPrefs?.().lang !== 'nl';
   const round = (x, y, r, fill) => { ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fillStyle = fill; ctx.fill(); };
   const press = { key: null, at: 0 }; // what is pressed right now (it dims instantly, on pointer-down)
@@ -139,7 +142,7 @@
     const TWO = { monitor: [['Claude ', 'Code'], ['Claude ', 'Code'], '#d97757'], spotify: [['Lecteur ', 'musique'], ['Music ', 'Player'], () => window.__winlandAlbumColour || '#ff375f'],
       focus: [['Minuteur ', 'focus'], ['Focus ', 'Timer'], '#bf5af2'], tray: [['Tiroir ', 'à fichiers'], ['File ', 'Tray'], '#ffd60a'], clips: [['Presse-', 'papiers'], ['Clip', 'board'], '#64d2ff'],
       note: [['Bloc-', 'notes'], ['Note', 'pad'], '#ffd60a'], chat: [['Pip ', 'Chat'], ['Pip ', 'Chat'], '#30d158'], apps: [['Toutes les ', 'apps'], ['All ', 'apps'], '#8e8e93'],
-      settings: [['Para', 'mètres'], ['Set', 'tings'], '#8e8e93'], mirror: [['Mi', 'roir'], ['Mir', 'ror'], '#8e8e93'], dev: [['Outils ', 'dev'], ['Dev ', 'Tools'], '#64d2ff'], controls: [['Con', 'trôles'], ['Con', 'trols'], '#ff9f0a'], system: [['Sys', 'tème'], ['Sys', 'tem'], '#30d158'], studio: [['Stu', 'dio'], ['Stu', 'dio'], '#bf5af2'], software: [['Logi', 'ciels'], ['Soft', 'ware'], '#0a84ff'] };
+      settings: [['Para', 'mètres'], ['Set', 'tings'], '#8e8e93'], mirror: [['Mi', 'roir'], ['Mir', 'ror'], '#8e8e93'], dev: [['Outils ', 'dev'], ['Dev ', 'Tools'], '#64d2ff'], controls: [['Con', 'trôles'], ['Con', 'trols'], '#ff9f0a'], system: [['Sys', 'tème'], ['Sys', 'tem'], '#30d158'], studio: [['Stu', 'dio'], ['Stu', 'dio'], '#bf5af2'], software: [['Logi', 'ciels'], ['Soft', 'ware'], '#0a84ff'], palette: [['Recher', 'che'], ['Sea', 'rch'], '#0a84ff'], rules: [['Automati', 'sations'], ['Auto', 'mations'], '#ffd60a'], dashboard: [['Tableau de bord ', 'Claude'], ['Claude ', 'dashboard'], '#d97757'], remote: [['Télé', 'phone'], ['Pho', 'ne'], '#30d158'] };
     const two = TWO[currentView === 'assistant' ? 'monitor' : currentView];
     if (!home && two) {
       const [a, b] = window.__winlandPrefs?.().lang === 'en' ? two[1] : two[0], tint = typeof two[2] === 'function' ? two[2]() : two[2];

@@ -14,6 +14,7 @@
   const DEFAULTS = { lang: 'fr', theme: 'dark', profile: 'custom', quietFullscreen: true, autoHide: true, privacyDot: true, shotsToTray: true, downloadsLive: true, chargeLive: true, breakEvery: 0, clipWarn: false, devWatch: false, speed: 'snel', focusMin: 25, focusSec: 1500,eye: 'mint', body: 'wolk', palette: 'klassiek', faces: true, blink: true,
     dance: true, confetti: true, chimes: true, notify: true, startup: true, sleepMin: 10, warnAt: 80,
     pack: 'verre', volumeHud: true, batteryWarn: true, appAnim: true,
+    notifIsland: true, micButton: true, ocrShots: true, careEyes: false, careWater: false, nightYawn: true, followMouse: false, smartClips: true, pipDesk: false,
     testMode: false, name: 'Pip', lightBusy: '#ff9a1f', lightDone: '#22e05a', lightError: '#ff3b3b' };
   const savedPrefs = store.get('winland:prefs', {});
   if (!savedPrefs.newLook) { savedPrefs.body = 'wolk'; savedPrefs.newLook = true; store.set('winland:prefs', savedPrefs); } // switch once to the new white look
@@ -78,16 +79,16 @@
   // when you save, the home screen widgets and the 4 quick buttons. "Eigen keuze" (custom) changes nothing.
   const PROFILES = {
     custom: null,
-    office: { apps: ['note', 'clips', 'focus', 'tray', 'clock', 'mirror', 'buddy', 'spotify', 'controls', 'software'],
+    office: { apps: ['note', 'clips', 'focus', 'tray', 'clock', 'mirror', 'buddy', 'spotify', 'controls', 'software', 'rules', 'remote'],
       home: [['note', 'W'], ['clips', 'W'], ['focus', 'S'], ['tray', 'S'], ['software', 'S'], ['settings', 'S']], quick: ['note', 'clips', 'focus', 'tray'],
       prefs: { chimes: true, notify: true, confetti: false, appAnim: false, dance: false, quietFullscreen: true, batteryWarn: true } },
-    dev: { apps: ['claude', 'dev', 'buddy', 'clips', 'note', 'focus', 'tray', 'spotify', 'clock', 'controls', 'system', 'software'],
+    dev: { apps: ['claude', 'dev', 'buddy', 'clips', 'note', 'focus', 'tray', 'spotify', 'clock', 'controls', 'system', 'software', 'dashboard', 'rules', 'remote'],
       home: [['claude', 'L'], ['dev', 'W'], ['focus', 'S'], ['clips', 'S']], quick: ['claude', 'dev', 'chat', 'clips'],
       prefs: { chimes: true, notify: true, confetti: true, appAnim: true, warnAt: 80, quietFullscreen: false, devWatch: true } },
-    gaming: { apps: ['spotify', 'clock', 'tray', 'controls', 'system', 'software'],
+    gaming: { apps: ['spotify', 'clock', 'tray', 'controls', 'system', 'software', 'rules', 'remote'],
       home: [['spotify', 'L'], ['system', 'W'], ['software', 'S'], ['tray', 'S']], quick: ['spotify', 'system', 'software', 'controls'],
       prefs: { chimes: false, notify: false, confetti: true, appAnim: true, volumeHud: true, batteryWarn: true, quietFullscreen: true, breakEvery: 120 } },
-    music: { apps: ['spotify', 'tray', 'note', 'focus', 'clock', 'controls', 'studio', 'software'],
+    music: { apps: ['spotify', 'tray', 'note', 'focus', 'clock', 'controls', 'studio', 'software', 'rules', 'remote'],
       home: [['spotify', 'L'], ['studio', 'W'], ['software', 'S'], ['tray', 'S']], quick: ['spotify', 'studio', 'software', 'tray'],
       prefs: { chimes: false, notify: true, confetti: false, dance: true, volumeHud: true, quietFullscreen: false, clipWarn: true } }
   };
@@ -99,7 +100,7 @@
     music: 'Muziek en lade voorop (sleep je samples erin). Geen eigen geluiden die je mix storen'
   };
   // every app you can turn on or off (the settings app's Apps page); Settings itself is always there
-  const ALL_APPS = ['software', 'system', 'studio', 'controls', 'claude', 'dev', 'buddy', 'spotify', 'focus', 'tray', 'clips', 'note', 'clock', 'mirror'];
+  const ALL_APPS = ['dashboard', 'rules', 'remote', 'software', 'system', 'studio', 'controls', 'claude', 'dev', 'buddy', 'spotify', 'focus', 'tray', 'clips', 'note', 'clock', 'mirror'];
   window.__winlandProfileOff = name => PROFILES[name] ? ALL_APPS.filter(id => !PROFILES[name].apps.includes(id)) : null;
   let profileApplied = store.get('winland:profile-applied', 'custom');
   function applyProfile() { // on save: the home screen follows the profile you picked (only when it changed)
@@ -109,7 +110,7 @@
     if (!p) return;
     window.__winlandSetAppsOff?.(window.__winlandProfileOff(prefs.profile)); // only the useful apps stay
     window.__winlandSetHome?.(p.home, p.quick);
-    const pageApp = { monitor: 'claude', assistant: 'claude', chat: 'buddy', spotify: 'spotify', focus: 'focus', tray: 'tray', clips: 'clips', note: 'note', mirror: 'mirror', dev: 'dev', controls: 'controls', system: 'system', studio: 'studio', software: 'software' }[currentView];
+    const pageApp = { monitor: 'claude', assistant: 'claude', chat: 'buddy', spotify: 'spotify', focus: 'focus', tray: 'tray', clips: 'clips', note: 'note', mirror: 'mirror', dev: 'dev', controls: 'controls', system: 'system', studio: 'studio', software: 'software', dashboard: 'dashboard', rules: 'rules', remote: 'remote' }[currentView];
     if (pageApp && window.__winlandAppsOff?.().has(pageApp)) setView('home'); // the page you were on just went
   }
 
@@ -119,13 +120,15 @@
   // out when the mouse goes to the top edge, and hides again when it leaves (main.js peek).
   let foreground = 'none', quiet = false, presence = '';
   function updateQuiet() {
-    quiet = Boolean(prefs.quietFullscreen && foreground === 'game');
+    quiet = Boolean((prefs.quietFullscreen && foreground === 'game') || window.__winlandMode?.() === 'stream'); // streaming mode (live-ui.js): hidden and silent
     const next = quiet ? 'hidden' : prefs.autoHide && foreground === 'cover' ? 'peek' : 'normal';
     if (next !== presence) { presence = next; window.winland?.setPresence?.(presence); }
   }
   window.winland?.onForeground?.(mode => { foreground = String(mode || 'none'); updateQuiet(); });
   window.winland?.foregroundGet?.().then(r => { foreground = String(r?.mode || 'none'); updateQuiet(); }).catch(() => {});
   window.__winlandQuiet = () => quiet;
+  window.__winlandUpdateQuiet = () => updateQuiet();
+  window.__winlandSetPref = (key, value) => { if (!(key in DEFAULTS)) return; prefs[key] = value; save(); }; // modes and automations (live-ui.js)
   // ---------- break reminder: how long a game has been in front (a pause of 5 min or more starts the count again) ----------
   let playSince = 0, lastGameAt = 0, reminded = 0;
   setInterval(() => {
@@ -142,14 +145,14 @@
   window.__winlandPlayTime = () => playSince && Date.now() - lastGameAt < 5 * 60000 ? Math.round((Date.now() - playSince) / 1000) : 0; // seconds
   apply();
 
-  const say = (title, body) => { if (!prefs.notify || quiet) return; try { new Notification(title, { body, silent: true }); } catch {} };
+  const say = (title, body) => { if (!prefs.notify || quiet || window.__winlandDnd?.()) return; try { new Notification(title, { body, silent: true }); } catch {} };
   window.__winlandPrefs = () => prefs;
   window.__winlandSay = say;
 
   // ---------- sounds: the melodies and packs live in sfx-ui.js ----------
   const PACKS = window.__winlandSfx?.packs || {};
   function chime(kind) {
-    if (!soundEnabled || !prefs.chimes || quiet) return;
+    if (!soundEnabled || !prefs.chimes || quiet || window.__winlandDnd?.()) return;
     window.__winlandSfx?.melody(kind, prefs.pack);
   }
 
@@ -568,6 +571,16 @@
     row('Pauzeherinnering', 'Een seintje als je zo lang aan het gamen bent', chips('breakEvery', [[0, 'Uit'], [60, '1 uur'], [90, '1,5 uur'], [120, '2 uur']])),
     row('Melding bij oversturing', 'Waarschuwt als het geluid van je pc in het rood gaat, ook in je DAW (pagina Studio)', toggle('clipWarn')),
     row('Batterij-waarschuwing', 'Laptop en Bluetooth (koptelefoon, muis) bijna leeg', toggle('batteryWarn')),
+    row('Notifications in the island', 'Discord, Outlook, Teams… show up in the island instead of the corner of the screen', toggle('notifIsland')),
+    row('Microphone button', 'During a call: cut the microphone of the whole PC in one click (or Ctrl+Alt+M), with a red dot while it is off', toggle('micButton')),
+    row('Text of screenshots', 'The text in a new screenshot goes to the clipboard (Windows reads it on this PC)', toggle('ocrShots')),
+    row('Smart clipboard', 'Suggests an action for what you copy: tidy JSON, see a colour, open a path, ask Pip about an error', toggle('smartClips')),
+    row('Island on the screen of your mouse', 'With several screens, the island follows your mouse', toggle('followMouse')),
+    '<div class="tc-group" data-icon="💚" style="--g:#30d158">Pip takes care of you</div>',
+    row('Rest your eyes', 'Every 20 minutes: look far away for 20 seconds', toggle('careEyes')),
+    row('Drink water', 'A little reminder every 90 minutes', toggle('careWater')),
+    row('Sleepy Pip', 'In the late evening Pip yawns and tells you it is late', toggle('nightYawn')),
+    row('Pip on the desktop', 'Pip leaves the island and walks on your screen: on the taskbar and on the window in front. Click him to bring him back', toggle('pipDesk')),
     `<div class="tc-setting-row"><div><strong>Alles terugzetten</strong><small>Zet al deze keuzes terug naar standaard</small></div><button type="button" class="tc-toggle" data-pref="reset">Herstel</button></div>`,
     '<div class="tc-group" data-icon="⏻" style="--g:#ff8a8a">WinLand</div>',
     row('Starten met Windows', 'WinLand start vanzelf als je je pc aanzet', `<button type="button" class="tc-toggle ${loginOn ? 'on' : ''}" data-login="1" aria-pressed="${loginOn}">${loginOn ? 'Aan' : 'Uit'}</button>`),
