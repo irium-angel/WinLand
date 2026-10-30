@@ -76,10 +76,22 @@ function setup(electron) {
   app.winlandVolumeNow = () => volumeNow;
   // the logo of a program, shortcut, file or folder, 128 px (a Stream Deck button): a data: URL, or '' when there is none
   app.winlandAppIcon = async file => { const r = await ask('appicon', 'appicon ' + Buffer.from(String(file), 'utf8').toString('base64'), 8000); return r && r !== '-' ? 'data:image/png;base64,' + r : ''; };
+  // A Windows notification, with its app's logo: the one Windows has for it, or else the logo of the app's Start menu
+  // shortcut (desktop apps like Discord often give Windows none). Looked up once per app.
+  const logos = new Map();
+  async function notified(n) {
+    app.winlandNotifSeen?.(n.aumid); // no banner in the corner for a new app either (notif-main.cjs)
+    if (!n.logo && n.app) {
+      if (!logos.has(n.app)) logos.set(n.app, (async () => { const file = app.winlandLaunch?.pathOf('apps', n.app); return file ? await app.winlandAppIcon(file).catch(() => '') : ''; })());
+      n.logo = await logos.get(n.app);
+    }
+    send('extras:notif', n);
+  }
   handle('extras:mic-get', async () => ({ muted: micMuted, notifications: notifAccess }));
   handle('extras:mic-set', async payload => { setMic(Boolean(payload?.muted)); return {}; });
   handle('extras:idle', async () => ({ seconds: electron.powerMonitor.getSystemIdleTime() })); // how long nobody touched the PC (automations)
   handle('extras:agenda', async () => { let list = []; try { list = JSON.parse(await ask('agenda', 'agenda', 8000)); } catch {} return { list: Array.isArray(list) ? list : [] }; }); // the Windows calendar, today
+  app.winlandAgenda = async () => { try { const list = JSON.parse(await ask('agenda', 'agenda', 8000)); return Array.isArray(list) ? list : []; } catch { return []; } }; // the calendar widget
   handle('extras:pixel', async () => { const r = await ask('pixel', 'pixel', 3000); const [hex] = String(r || '').split(' '); return { hex: /^#[0-9a-f]{6}$/.test(hex) ? hex : '' }; });
   // the text in a picture (a screenshot): Windows' own OCR, on this PC
   handle('extras:ocr', async payload => {
@@ -208,7 +220,7 @@ function setup(electron) {
         if (level === 'outputs') { let list = []; try { list = JSON.parse(muted); } catch {} outputWaiters.splice(0).forEach(done => done(list)); continue; }
         if (level === 'mic' || level === 'cam') { privacy[level] = (muted || '').split('|').filter(Boolean); send('extras:privacy', privacy); continue; } // who uses them
         if (level === 'fg') { foreground = muted; send('extras:foreground', foreground); continue; } // the window in front: none / cover / game
-        if (level === 'notif') { try { send('extras:notif', JSON.parse(muted)); } catch {} continue; } // a Windows notification (Discord, Outlook…)
+        if (level === 'notif') { try { notified(JSON.parse(muted)); } catch {} continue; } // a Windows notification (Discord, Outlook…)
         if (level === 'notif-access') { notifAccess = muted; continue; }
         if (level === 'micmute') { micMuted = muted === '1'; send('extras:micmute', { muted: micMuted, known: muted !== '-' }); continue; }
         if (level === 'front') { screenTime.front(muted); send('extras:front', muted); continue; } // the program in front (screen time, automations)

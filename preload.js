@@ -124,6 +124,14 @@
     onRemoteDo: callback => subscribe('remote:do', callback),
     pipDesk: on => ipcRenderer.invoke('pip:desk', Boolean(on)), // Pip on the desktop (companion-main.cjs)
     onPipHome: callback => subscribe('pip:home', callback),
+    notifOpen: what => ipcRenderer.invoke('notif:open', { app: String(what?.app || ''), aumid: String(what?.aumid || ''), settings: what?.settings === true }), // a click on a notification (notif-main.cjs)
+    onNotifWindowsOff: callback => subscribe('notif:windows-off', callback), // notifications are off for all of Windows
+    notifOnlyIsland: on => ipcRenderer.send('notif:only-island', Boolean(on)), // no banners in the corner of the screen
+    islandOff: off => ipcRenderer.send('island:off', Boolean(off)), // Settings: no island at all (main.js)
+    onIslandOn: callback => subscribe('island:turn-on', callback), // the tray's "Open the island" while it is off
+    widgetsState: state => ipcRenderer.send('widgets:state', state), // what the desktop widgets show (widgets-main.cjs)
+    onWidgetsDo: callback => subscribe('widgets:do', callback),
+    widgetsGallery: () => ipcRenderer.send('widgets:gallery'),
     privacyGet: () => ipcRenderer.invoke('extras:privacy-get'),
     onNewFile: callback => subscribe('extras:new-file', callback), // a new screenshot or a finished download
     // Controls page (controls-ui.js)

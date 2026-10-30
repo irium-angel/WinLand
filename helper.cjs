@@ -27,7 +27,7 @@ function helper() {
     if (built !== hash || !fs.existsSync(out)) {
       fs.mkdirSync(dir, { recursive: true });
       execFileSync(path.join(FRAMEWORK, 'csc.exe'), ['-nologo', '-optimize+', '-target:exe', '-out:' + out,
-        '-r:System.Drawing.dll', '-r:' + path.join(FRAMEWORK, 'System.Runtime.dll'),
+        '-r:System.Drawing.dll', '-r:' + path.join(FRAMEWORK, 'System.Runtime.dll'), '-r:' + path.join(FRAMEWORK, 'System.Runtime.WindowsRuntime.dll'), // Size (notification logos)
         '-r:' + path.join(METADATA, 'Windows.Foundation.winmd'), '-r:' + path.join(METADATA, 'Windows.Media.winmd'), '-r:' + path.join(METADATA, 'Windows.Storage.winmd'),
         '-r:' + path.join(METADATA, 'Windows.Graphics.winmd'), '-r:' + path.join(METADATA, 'Windows.UI.winmd'), '-r:' + path.join(METADATA, 'Windows.ApplicationModel.winmd'), // OCR, notifications
         SOURCE], { windowsHide: true, timeout: 60000, stdio: 'pipe' });

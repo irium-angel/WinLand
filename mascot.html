@@ -4846,6 +4846,7 @@ function drawIslandFrame(
 
   const overHit =
     pointer.known &&
+    ( inside( pointer.x, pointer.y, window.__winlandCardRect ) || // a notification card that opens its app (live-ui.js)
     Object.values(
       hit
     ).some(
@@ -4855,7 +4856,7 @@ function drawIslandFrame(
           pointer.y,
           bounds
         )
-    );
+    ) );
 
 
   // Catch the mouse only while it is really on the island. Typing does not need it (keyboard focus
@@ -5316,6 +5317,7 @@ setInterval(
 <script src="./deck-icons.js"></script>
 <script src="./qr.js"></script>
 <script src="./remote-ui.js"></script>
+<script src="./widgets-ui.js"></script>
 <script src="./island-window-ui.js"></script>
 <script src="./pip-ui.js"></script>
 <script src="./theme-ui.js"></script>

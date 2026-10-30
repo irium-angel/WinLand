@@ -591,6 +591,24 @@ namespace WinLand {
   }
 
   static class Notify {
+    // "notif-take 1": WinLand shows them in the island, so each one also leaves the corner of the screen at once
+    public static volatile bool take;
+    static readonly System.Collections.Generic.Dictionary<string, string> logos = new System.Collections.Generic.Dictionary<string, string>();
+    // the app's own logo, as Windows has it for its notifications (read once per app)
+    static string Logo(UserNotification n, string id) {
+      string logo; if (logos.TryGetValue(id, out logo)) return logo;
+      logo = "";
+      try {
+        var stream = Tools.Wait(n.AppInfo.DisplayInfo.GetLogo(new Windows.Foundation.Size(64, 64)).OpenReadAsync());
+        if (stream.Size > 0 && stream.Size < 512 * 1024) {
+          var reader = new DataReader(stream.GetInputStreamAt(0));
+          uint got = Tools.Wait(reader.LoadAsync((uint)stream.Size));
+          var bytes = new byte[got]; reader.ReadBytes(bytes);
+          if (bytes.Length > 0) logo = "data:" + (bytes[0] == 0x89 ? "image/png" : "image/jpeg") + ";base64," + Convert.ToBase64String(bytes);
+        }
+      } catch { }
+      logos[id] = logo; return logo;
+    }
     public static void Run() {
       var thread = new Thread(() => {
         var seen = new System.Collections.Generic.HashSet<uint>(); bool first = true;
@@ -602,19 +620,38 @@ namespace WinLand {
           try {
             foreach (var n in Tools.Wait(l.GetNotificationsAsync(NotificationKinds.Toast))) {
               if (!seen.Add(n.Id) || first) continue;
-              string app = ""; try { app = n.AppInfo.DisplayInfo.DisplayName; } catch { }
+              string app = "", id = "";
+              try { app = n.AppInfo.DisplayInfo.DisplayName; } catch { }
+              try { id = n.AppInfo.AppUserModelId; } catch { }
               var texts = new System.Collections.Generic.List<string>();
               try { var b = n.Notification.Visual.GetBinding(KnownNotificationBindings.ToastGeneric); if (b != null) foreach (var t in b.GetTextElements()) texts.Add(t.Text); } catch { }
               if (texts.Count == 0) continue;
-              Program.Say("notif {\"id\":" + n.Id + ",\"app\":" + J.S(app) + ",\"title\":" + J.S(texts[0]) + ",\"body\":" + J.S(string.Join("\n", texts.GetRange(1, texts.Count - 1))) + "}");
+              bool own = app.IndexOf("winland", StringComparison.OrdinalIgnoreCase) >= 0 || app.IndexOf("electron", StringComparison.OrdinalIgnoreCase) >= 0;
+              Program.Say("notif {\"id\":" + n.Id + ",\"app\":" + J.S(app) + ",\"aumid\":" + J.S(id) + ",\"logo\":" + J.S(id == "" ? "" : Logo(n, id)) + ",\"title\":" + J.S(texts[0]) + ",\"body\":" + J.S(string.Join("\n", texts.GetRange(1, texts.Count - 1))) + "}");
+              if (take && !own) { try { l.RemoveNotification(n.Id); } catch { } } // shown in the island instead of the corner
             }
             first = false;
           } catch { }
-          Thread.Sleep(1500);
+          Thread.Sleep(take ? 300 : 1500);
         }
       });
       thread.IsBackground = true; thread.Start();
     }
+  }
+
+  // ---------- desktop widgets: a window that lives on the desktop, under the other windows ----------
+  static class Desk {
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern IntPtr FindWindow(string cls, string name);
+    [DllImport("user32.dll", EntryPoint = "SetWindowLongPtrW")] static extern IntPtr SetWindowLongPtr(IntPtr h, int index, IntPtr value);
+    [DllImport("user32.dll")] static extern bool SetWindowPos(IntPtr h, IntPtr after, int x, int y, int w, int hh, uint flags);
+    const int GWLP_HWNDPARENT = -8; const uint NOSIZE = 1, NOMOVE = 2, NOACTIVATE = 0x10;
+    // owned by the desktop (Progman): it stays when Win+D shows the desktop, and sits just above the wallpaper
+    public static void Attach(long hwnd) {
+      IntPtr h = new IntPtr(hwnd), desk = FindWindow("Progman", null);
+      if (desk != IntPtr.Zero) SetWindowLongPtr(h, GWLP_HWNDPARENT, desk);
+      Bottom(hwnd);
+    }
+    public static void Bottom(long hwnd) { SetWindowPos(new IntPtr(hwnd), new IntPtr(1), 0, 0, 0, 0, NOSIZE | NOMOVE | NOACTIVATE); } // HWND_BOTTOM
   }
 
   static class Watch {
@@ -632,6 +669,9 @@ namespace WinLand {
             else if (parts.Length == 2 && parts[0] == "micmute") { Audio.MicMute(parts[1] == "1"); Program.Say("micmute " + Audio.MicMuted()); }
             else if (parts[0] == "pixel") Program.Say("pixel " + Tools.Pixel());
             else if (parts.Length == 2 && parts[0] == "keys") Keys.Press(parts[1]); // Stream Deck
+            else if (parts.Length == 2 && parts[0] == "notif-take") Notify.take = parts[1] == "1";
+            else if (parts.Length == 2 && parts[0] == "deskwin") Desk.Attach(long.Parse(parts[1]));
+            else if (parts.Length == 2 && parts[0] == "deskbottom") Desk.Bottom(long.Parse(parts[1]));
             else if (parts.Length == 2 && parts[0] == "appicon") { string r; try { r = AppIcon.Png(Encoding.UTF8.GetString(Convert.FromBase64String(parts[1]))); } catch { r = ""; } Program.Say("appicon " + (r == "" ? "-" : r)); }
             else if (parts.Length == 2 && parts[0] == "type") Keys.Type(Encoding.UTF8.GetString(Convert.FromBase64String(parts[1])));
             else if (parts.Length == 2 && parts[0] == "rect") Program.Say("rect " + Tools.FrontRect(int.Parse(parts[1])));

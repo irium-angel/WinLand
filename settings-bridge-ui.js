@@ -95,7 +95,7 @@
     if (el.dataset.login) { d.login = !(d.login ?? el.classList.contains('on')); return; }
     if (el.dataset.save) { const key = el.dataset.pref; d.extras[key] = box.querySelector('#tc-in-' + key)?.value || ''; return; }
     // these really happen right now: quit, restart and the test buttons (they test the island itself)
-    if (el.dataset.quit || el.dataset.restart || el.dataset.test) { el.click(); return; }
+    if (el.dataset.quit || el.dataset.restart || el.dataset.test || el.dataset.widgets) { el.click(); return; }
     window.__winlandWithDraft(d.prefs, () => el.click());
     window.__winlandPreviewPrefs(d.prefs);
     if (el.dataset.pref === 'profile') { // a profile is applied at once: its apps, home screen and switches, no Save needed

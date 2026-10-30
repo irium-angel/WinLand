@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src 'self' data: file:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'">
+<title>Widgets — WinLand</title>
+<link rel="stylesheet" href="./widgets.css">
+<style>
+  /* the gallery: like the widget gallery of a Mac, dark, the widgets themselves as previews */
+  :root{color-scheme:dark;--bg:#1c1c1e;--panel:#2c2c2e;--panel2:#3a3a3c;--ink:#fff;--ink2:#aeaeb2;--ink3:#8e8e93;--accent:#0a84ff;--sep:rgba(255,255,255,.08)}
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:13px/1.4 "Segoe UI Variable Text","Segoe UI",Inter,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+  header{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:18px;padding:18px 24px 14px;background:rgba(28,28,30,.85);backdrop-filter:blur(20px) saturate(1.6);border-bottom:1px solid var(--sep)}
+  h1{margin:0;font:700 22px "Segoe UI Variable Display","Segoe UI",sans-serif;letter-spacing:-.02em}
+  .seg{display:inline-flex;padding:2px;border-radius:9px;background:var(--panel)}
+  .seg button{border:0;background:none;color:var(--ink2);font:600 12.5px inherit;font-family:inherit;height:28px;padding:0 14px;border-radius:7px;cursor:pointer;transition:background .2s,color .2s}
+  .seg button.on{background:var(--panel2);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.3)}
+  .grow{flex:1}
+  label.sw{display:flex;align-items:center;gap:9px;color:var(--ink2);font-weight:600;cursor:pointer}
+  .switch{position:relative;width:40px;height:24px;border-radius:12px;background:var(--panel2);border:0;padding:0;cursor:pointer;transition:background .2s;flex:none}
+  .switch::after{content:"";position:absolute;left:2px;top:2px;width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.4);transition:transform .45s var(--wl-spring,cubic-bezier(.23,1,.32,1)),width .2s}
+  .switch.on{background:#30d158}.switch.on::after{transform:translateX(16px)}
+  .switch:active::after{width:26px}.switch.on:active::after{transform:translateX(10px)}
+  main{padding:22px 24px 40px}
+  .hint{color:var(--ink3);margin:0 0 18px;max-width:640px}
+  .kinds{display:grid;grid-template-columns:repeat(auto-fill,minmax(372px,1fr));gap:16px}
+  .kind{background:var(--panel);border-radius:18px;padding:16px;display:flex;flex-direction:column;gap:12px}
+  .kind .top{display:flex;align-items:center;gap:10px}
+  .kind h3{margin:0;font-size:15px;font-weight:650}.kind p{margin:0;color:var(--ink3);font-size:12px}
+  .stage{height:344px;display:grid;place-items:center;border-radius:14px;background:radial-gradient(circle at 30% 20%,#3a3a5a,#16161e 70%);overflow:hidden}
+  .stage.short{height:196px}
+  .plus{margin-left:auto;width:30px;height:30px;border-radius:50%;border:0;background:var(--accent);color:#fff;display:grid;place-items:center;cursor:pointer;flex:none;transition:transform .2s cubic-bezier(.23,1,.32,1)}
+  .plus:active{transform:scale(.9);transition-duration:.08s}
+  .plus svg{width:16px;height:16px;stroke:#fff;stroke-width:2.6;stroke-linecap:round}
+  .mine{display:grid;gap:12px;max-width:820px}
+  .row{display:flex;gap:16px;align-items:flex-start;background:var(--panel);border-radius:16px;padding:14px}
+  .thumb{width:172px;height:172px;flex:none;display:grid;place-items:center;border-radius:12px;background:radial-gradient(circle at 30% 20%,#3a3a5a,#16161e 70%);overflow:hidden}
+  .thumb>div{transform:scale(.48);transform-origin:center}
+  .meta{flex:1;min-width:0;display:flex;flex-direction:column;gap:10px}
+  .meta h3{margin:0;font-size:14px;font-weight:650;display:flex;align-items:center;gap:10px}
+  .field{display:flex;flex-direction:column;gap:5px}.field span{color:var(--ink3);font-size:11.5px;font-weight:600}
+  input[type=text],input[type=date],textarea{width:100%;border:0;border-radius:9px;background:var(--panel2);color:var(--ink);font:13px inherit;font-family:inherit;padding:8px 10px;outline:none;box-shadow:inset 0 0 0 1px transparent;transition:box-shadow .15s}
+  input:focus,textarea:focus{box-shadow:inset 0 0 0 2px var(--accent)}
+  textarea{resize:vertical;min-height:70px}
+  .btn{border:0;border-radius:9px;height:32px;padding:0 14px;background:var(--panel2);color:var(--ink);font:600 12.5px inherit;font-family:inherit;cursor:pointer;display:inline-flex;align-items:center;gap:7px;transition:transform .2s cubic-bezier(.23,1,.32,1),background .15s}
+  .btn:hover{background:#48484a}.btn:active{transform:scale(.97);transition-duration:.08s}
+  .btn.bad{color:#ff453a;margin-left:auto}
+  .colours{display:flex;gap:8px}
+  .colours button{width:24px;height:24px;border-radius:50%;border:0;cursor:pointer;box-shadow:inset 0 0 0 2px rgba(255,255,255,.15);transition:transform .2s cubic-bezier(.23,1,.32,1)}
+  .colours button.on{box-shadow:0 0 0 2px var(--bg),0 0 0 4px #fff}.colours button:active{transform:scale(.9)}
+  .empty{color:var(--ink3);padding:30px 0}
+  .row.flash{animation:flash 1.2s cubic-bezier(.23,1,.32,1)}@keyframes flash{0%{box-shadow:0 0 0 3px var(--accent)}100%{box-shadow:0 0 0 0 transparent}}
+  [hidden]{display:none!important}
+  @media (prefers-reduced-motion:reduce){*{transition-duration:.01ms!important;animation:none!important}}
+</style>
+</head>
+<body>
+<header>
+  <h1 id="title">Widgets</h1>
+  <div class="seg" role="tablist"><button id="tabAdd" class="on" role="tab"></button><button id="tabMine" role="tab"></button></div>
+  <div class="grow"></div>
+  <label class="sw"><span id="onLabel"></span><button class="switch" id="on" role="switch"></button></label>
+  <label class="sw"><span id="lockLabel"></span><button class="switch" id="lock" role="switch"></button></label>
+</header>
+<main>
+  <p class="hint" id="hint"></p>
+  <section id="add" class="kinds"></section>
+  <section id="mine" class="mine" hidden></section>
+</main>
+<script src="./widgets-render.js"></script>
+<script>
+'use strict';
+const $ = id => document.getElementById(id), esc = WinLandWidgets.esc, KINDS = WinLandWidgets.KINDS;
+let view = null, tab = 'add', sizes = {}, previews = [], minePreviews = [];
+const lang = () => view?.lang === 'en' ? 'en' : 'fr', T = (fr, en) => lang() === 'en' ? en : fr;
+const COLOURS = ['#ff9500', '#ff3b30', '#ff2d55', '#af52de', '#5856d6', '#007aff', '#34c759', '#8e8e93'];
+const ctx = () => ({ lang: lang(), state: view.state, cover: view.cover, system: view.system, agenda: view.agenda, battery: { none: !view.hasBattery, level: .76, charging: false, dischargingTime: 12600 }, preview: true, still: matchMedia('(prefers-reduced-motion: reduce)').matches, pictureUrl: name => view.pictures + encodeURIComponent(name) });
+const PLUS = '<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>';
+
+function words() {
+  $('tabAdd').textContent = T('Ajouter', 'Add'); $('tabMine').textContent = T(`Mes widgets (${view.items.length})`, `My widgets (${view.items.length})`);
+  $('onLabel').textContent = T('Sur le bureau', 'On the desktop'); $('lockLabel').textContent = T('Verrouiller l’emplacement', 'Lock placement');
+  $('hint').textContent = tab === 'add'
+    ? T('Choisis une taille, puis +. Le widget arrive en haut à gauche de ton bureau : fais-le glisser où tu veux, puis verrouille l’emplacement. Clic droit sur un widget pour changer sa taille.', 'Pick a size, then +. The widget lands at the top left of your desktop: drag it where you want, then lock the placement. Right-click a widget to change its size.')
+    : T('Tes widgets. Les notes s’écrivent aussi directement sur le bureau (clique dessus quand l’emplacement est verrouillé).', 'Your widgets. Notes can also be typed right on the desktop (click one while the placement is locked).');
+  for (const [id, on] of [['on', view.on], ['lock', view.locked]]) { $(id).classList.toggle('on', on); $(id).setAttribute('aria-checked', String(on)); }
+}
+// ---------- add: every kind, the size you pick, shown for real ----------
+function drawAdd() {
+  previews = [];
+  $('add').innerHTML = Object.entries(KINDS).map(([k, d]) => {
+    const size = sizes[k] || d.sizes[0];
+    return `<div class="kind"><div class="top"><div><h3>${esc(T(d.fr, d.en))}</h3><p>${esc(T(...d.about))}</p></div>
+      <button class="plus" data-add="${k}" aria-label="${T('Ajouter', 'Add')}">${PLUS}</button></div>
+      <div class="stage ${size === 'l' ? '' : 'short'}" data-preview="${k}"></div>
+      ${d.sizes.length > 1 ? `<div class="seg">${d.sizes.map(s => `<button data-size="${k}:${s}" class="${s === size ? 'on' : ''}">${{ s: T('Petit', 'Small'), m: T('Moyen', 'Medium'), l: T('Grand', 'Large') }[s]}</button>`).join('')}</div>` : ''}</div>`;
+  }).join('');
+  for (const el of $('add').querySelectorAll('[data-preview]')) {
+    const k = el.dataset.preview, sample = { id: 'preview', kind: k, size: sizes[k] || KINDS[k].sizes[0], opts: SAMPLES[k] || {} };
+    previews.push(WinLandWidgets.mount(el, sample, { ...ctx(), item: sample }));
+  }
+}
+const SAMPLES = {
+  note: { text: 'Appeler Léa\nFinir la maquette\nAcheter du café' },
+  countdown: { title: 'Vacances', date: new Date(Date.now() + 18 * 86400000).toISOString().slice(0, 10) },
+  custom: { title: 'Ton widget', text: 'Une photo, un titre, un texte', colour: '#5856d6' }
+};
+// ---------- mine: each widget, its size, its words and picture ----------
+function drawMine() {
+  minePreviews = [];
+  if (!view.items.length) { $('mine').innerHTML = `<div class="empty">${T('Aucun widget pour l’instant. Ajoute-en un depuis l’onglet Ajouter.', 'No widgets yet. Add one from the Add tab.')}</div>`; return; }
+  $('mine').innerHTML = view.items.map(it => {
+    const d = KINDS[it.kind], o = it.opts || {};
+    const sizesHtml = d.sizes.length > 1 ? `<div class="seg">${d.sizes.map(s => `<button data-resize="${it.id}:${s}" class="${s === it.size ? 'on' : ''}">${{ s: T('Petit', 'Small'), m: T('Moyen', 'Medium'), l: T('Grand', 'Large') }[s]}</button>`).join('')}</div>` : '';
+    let edit = '';
+    if (it.kind === 'note') edit = `<label class="field"><span>${T('Texte', 'Text')}</span><textarea data-opt="${it.id}:text" maxlength="4000">${esc(o.text || '')}</textarea></label>`;
+    if (it.kind === 'countdown') edit = `<label class="field"><span>${T('Titre', 'Title')}</span><input type="text" data-opt="${it.id}:title" maxlength="60" value="${esc(o.title || '')}"></label>
+      <label class="field"><span>${T('Date', 'Date')}</span><input type="date" data-opt="${it.id}:date" value="${esc(o.date || '')}"></label>${colours(it)}`;
+    if (it.kind === 'custom') edit = `<div style="display:flex;gap:8px;align-items:center"><button class="btn" data-pick="${it.id}">${T('Choisir une image…', 'Choose a picture…')}</button>${o.image ? `<button class="btn" data-unpick="${it.id}">${T('Retirer l’image', 'Remove picture')}</button>` : ''}</div>
+      <label class="field"><span>${T('Titre', 'Title')}</span><input type="text" data-opt="${it.id}:title" maxlength="60" value="${esc(o.title || '')}"></label>
+      <label class="field"><span>${T('Texte', 'Text')}</span><input type="text" data-opt="${it.id}:text" maxlength="300" value="${esc(o.text || '')}"></label>${o.image ? '' : colours(it)}`;
+    return `<div class="row" data-row="${it.id}"><div class="thumb" data-thumb="${it.id}"></div><div class="meta"><h3>${esc(T(d.fr, d.en))}<button class="btn bad" data-remove="${it.id}">${T('Supprimer', 'Remove')}</button></h3>${sizesHtml}${edit}</div></div>`;
+  }).join('');
+  for (const el of $('mine').querySelectorAll('[data-thumb]')) {
+    const it = view.items.find(x => x.id === el.dataset.thumb); const box = document.createElement('div'); el.append(box);
+    const scale = it.size === 's' ? .8 : .48; box.style.transform = `scale(${scale})`;
+    minePreviews.push({ id: it.id, w: WinLandWidgets.mount(box, it, { ...ctx(), item: it }) });
+  }
+}
+const colours = it => `<div class="field"><span>${T('Couleur', 'Colour')}</span><div class="colours">${COLOURS.map(c => `<button style="background:${c}" data-colour="${it.id}:${c}" class="${(it.opts.colour || '') === c ? 'on' : ''}" aria-label="${c}"></button>`).join('')}</div></div>`;
+function draw() { words(); $('add').hidden = tab !== 'add'; $('mine').hidden = tab !== 'mine'; if (tab === 'add') drawAdd(); else drawMine(); }
+function refresh(patch) {
+  view = { ...view, ...patch };
+  if (patch.items || 'on' in patch || 'locked' in patch) { if (document.activeElement?.matches('input,textarea') && !patch.edit) { words(); return; } draw(); }
+  else { const c = ctx(); for (const p of previews) p.update(c); for (const p of minePreviews) p.w.update(c); }
+  if (patch.edit) { tab = 'mine'; $('tabAdd').classList.remove('on'); $('tabMine').classList.add('on'); draw(); const r = document.querySelector(`[data-row="${patch.edit}"]`); r?.scrollIntoView({ block: 'center' }); r?.classList.add('flash'); }
+}
+
+document.addEventListener('click', async e => {
+  const b = e.target.closest('button'); if (!b) return;
+  if (b === $('tabAdd') || b === $('tabMine')) { tab = b === $('tabAdd') ? 'add' : 'mine'; $('tabAdd').classList.toggle('on', tab === 'add'); $('tabMine').classList.toggle('on', tab === 'mine'); return draw(); }
+  if (b.id === 'on') return refresh(await wl.setPrefs({ on: !view.on }));
+  if (b.id === 'lock') return refresh(await wl.setPrefs({ locked: !view.locked }));
+  if (b.dataset.size) { const [k, s] = b.dataset.size.split(':'); sizes[k] = s; return drawAdd(); }
+  if (b.dataset.add) { const k = b.dataset.add; await wl.add(k, sizes[k] || KINDS[k].sizes[0], SAMPLES[k] && k !== 'note' ? SAMPLES[k] : {}); b.animate([{ transform: 'scale(.85)' }, { transform: 'scale(1)' }], { duration: 300, easing: 'cubic-bezier(.23,1,.32,1)' }); return; }
+  if (b.dataset.resize) { const [id, s] = b.dataset.resize.split(':'); return wl.update(id, { size: s }); }
+  if (b.dataset.remove) return refresh(await wl.removeItem(b.dataset.remove));
+  if (b.dataset.colour) { const [id, c] = b.dataset.colour.split(':'); return wl.update(id, { opts: { colour: c } }); }
+  if (b.dataset.pick) { const r = await wl.pickImage(); if (r?.ok) wl.update(b.dataset.pick, { opts: { image: r.image } }); else if (r?.error) alert(r.error); return; }
+  if (b.dataset.unpick) return wl.update(b.dataset.unpick, { opts: { image: '' } });
+});
+// words typed in: saved a moment after (the widget on the desktop changes at once)
+const timers = {};
+document.addEventListener('input', e => {
+  const f = e.target.closest('[data-opt]'); if (!f) return;
+  const [id, key] = f.dataset.opt.split(':');
+  clearTimeout(timers[f.dataset.opt]); timers[f.dataset.opt] = setTimeout(() => wl.update(id, { opts: { [key]: f.value } }), 350);
+});
+wl.onChanged(refresh);
+wl.list().then(v => { view = v; document.documentElement.lang = lang(); draw(); });
+setInterval(() => { if (view) { const c = ctx(); for (const p of previews) p.update(c); } }, 1000); // the previews' clock
+</script>
+</body>
+</html>

@@ -1,0 +1,126 @@
+/* WinLand's desktop widgets, drawn like Apple's: a rounded card, one idea per widget, big numbers with tight
+   tracking, a colour that means something. Light and dark follow Windows. Used by widget.html and the gallery. */
+:root{
+  --wl-ease-out:cubic-bezier(.23,1,.32,1);
+  --card:#ffffff;--card2:#f2f2f7;--text:#1c1c1e;--dim:#8e8e93;--faint:#c7c7cc;--line:rgba(0,0,0,.08);
+  --red:#ff3b30;--orange:#ff9500;--yellow:#ffcc00;--green:#34c759;--blue:#007aff;--purple:#af52de;
+  --shadow:0 10px 30px rgba(0,0,0,.18),0 1px 3px rgba(0,0,0,.08);
+}
+@media (prefers-color-scheme:dark){
+  :root{--card:#1c1c1e;--card2:#2c2c2e;--text:#ffffff;--dim:#8e8e93;--faint:#48484a;--line:rgba(255,255,255,.1);
+    --red:#ff453a;--orange:#ff9f0a;--yellow:#ffd60a;--green:#30d158;--blue:#0a84ff;--purple:#bf5af2;
+    --shadow:0 10px 30px rgba(0,0,0,.45),0 0 0 .5px rgba(255,255,255,.08)}
+}
+.wl{position:relative;width:var(--w);height:var(--h);border-radius:22px;background:var(--card);color:var(--text);box-shadow:var(--shadow);overflow:hidden;
+  font:13px/1.25 "Segoe UI Variable Text","Segoe UI",Inter,system-ui,sans-serif;-webkit-font-smoothing:antialiased;user-select:none;cursor:default;
+  transition:transform .2s var(--wl-ease-out)}
+.wl.s-s{--w:164px;--h:164px}.wl.s-m{--w:344px;--h:164px}.wl.s-l{--w:344px;--h:344px}
+.wl .pad{position:absolute;inset:0;padding:15px 16px;display:flex;flex-direction:column}
+.wl .cap{font-size:11px;font-weight:700;letter-spacing:.02em;text-transform:uppercase}
+.wl .num{font-family:"Segoe UI Variable Display","Segoe UI",Inter,system-ui,sans-serif;font-variant-numeric:tabular-nums;letter-spacing:-.03em;line-height:1}
+.wl .dim{color:var(--dim)}
+.wl .ell{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wl svg.ic{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
+
+/* clock: a dial, the second hand sweeps like Apple's */
+.k-clock .dial{position:absolute;inset:8px}
+.k-clock.s-m .dial{inset:10px auto 10px 10px;width:144px}
+.k-clock .dial svg{width:100%;height:100%;display:block}
+.k-clock .face{fill:var(--card)}.k-clock .ticks{stroke:var(--faint);stroke-width:.8}.k-clock .hours text{fill:var(--text);font:600 9.5px "Segoe UI Variable Display","Segoe UI",sans-serif;text-anchor:middle;dominant-baseline:central}
+.k-clock .h,.k-clock .m{stroke:var(--text);stroke-linecap:round}.k-clock .h{stroke-width:3.4}.k-clock .m{stroke-width:2.4}
+.k-clock .sec{stroke:var(--orange);stroke-width:1;stroke-linecap:round}.k-clock .pin{fill:var(--orange)}.k-clock .pin2{fill:var(--card)}
+.k-clock .sweep{transform-origin:50px 50px;animation:sweep 60s linear infinite;animation-delay:var(--sd,0s)} /* the hour and minute hands turn with their own transform attribute */
+@keyframes sweep{to{transform:rotate(360deg)}}
+.k-clock .side{position:absolute;left:170px;right:16px;top:0;bottom:0;display:flex;flex-direction:column;justify-content:center;gap:6px}
+.k-clock .side .num{font-size:46px;font-weight:600}
+.k-clock .side .day{font-size:13px;font-weight:600;color:var(--orange)}
+
+/* calendar: the day in red, the date big, then what is next */
+.k-calendar .day{color:var(--red)}
+.k-calendar .big{font-size:44px;font-weight:300;margin-top:2px}
+.k-calendar .ev{display:flex;gap:7px;margin-top:7px;min-width:0}
+.k-calendar .ev i{width:3px;border-radius:2px;background:var(--c,var(--blue));flex:none}
+.k-calendar .ev b{display:block;font-size:12px;font-weight:600}
+.k-calendar .ev small{display:block;font-size:11px;color:var(--dim)}
+.k-calendar .none{font-size:12px;color:var(--dim);margin-top:auto}
+.k-calendar.s-m .pad{flex-direction:row;gap:16px}
+.k-calendar.s-m .left{width:96px;flex:none;display:flex;flex-direction:column}
+.k-calendar.s-m .right{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:flex-start}
+.k-calendar .month{display:grid;grid-template-columns:repeat(7,1fr);gap:3px 0;margin-top:10px;text-align:center;font-size:11.5px;font-weight:600;font-variant-numeric:tabular-nums}
+.k-calendar .month span{height:22px;line-height:22px;border-radius:50%;width:22px;margin:0 auto}
+.k-calendar .month .h{color:var(--dim);font-size:10px}
+.k-calendar .month .o{color:var(--faint)}
+.k-calendar .month .t{background:var(--red);color:#fff}
+
+/* music: the cover's colour fills the card, white type on it */
+.k-music{--c:#2c2c2e;color:#fff;background:linear-gradient(160deg,color-mix(in srgb,var(--c) 70%,#000),color-mix(in srgb,var(--c) 40%,#000))}
+.k-music .cover{width:58px;height:58px;border-radius:11px;background:rgba(255,255,255,.14);display:grid;place-items:center;overflow:hidden;flex:none;box-shadow:0 4px 12px rgba(0,0,0,.3)}
+.k-music .cover img{width:100%;height:100%;object-fit:cover;display:block}
+.k-music .cover svg{width:26px;height:26px;opacity:.7}
+.k-music .t{font-size:14px;font-weight:650;margin-top:auto}.k-music .a{font-size:12.5px;color:rgba(255,255,255,.7)}
+.k-music.s-m .cover{width:116px;height:116px;border-radius:14px}
+.k-music.s-m .pad{flex-direction:row;gap:16px;align-items:center}
+.k-music.s-m .info{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center;height:100%}
+.k-music .bar{height:4px;border-radius:2px;background:rgba(255,255,255,.25);margin:10px 0 4px;overflow:hidden}.k-music .bar b{display:block;height:100%;background:#fff;border-radius:2px}
+.k-music .ctl{display:flex;align-items:center;justify-content:space-between;margin-top:6px;max-width:150px}
+.k-music .ctl button{border:0;background:none;color:#fff;padding:4px;border-radius:10px;display:grid;place-items:center;cursor:pointer;transition:transform .2s var(--wl-ease-out),opacity .2s}
+.k-music .ctl button:active{transform:scale(.9);opacity:.6;transition-duration:.08s}
+.k-music .ctl svg{fill:#fff}
+.k-music .src{position:absolute;top:13px;right:14px;font-size:10.5px;font-weight:700;color:rgba(255,255,255,.75)}
+
+/* rings: battery and system */
+.ring{position:relative;display:grid;place-items:center}
+.ring svg{display:block;transform:rotate(-90deg)}
+.ring .bg{stroke:var(--card2);fill:none}.ring .fg{fill:none;stroke-linecap:round;transition:stroke-dashoffset .6s var(--wl-ease-out)}
+.ring .mid{position:absolute;inset:0;display:grid;place-items:center;text-align:center}
+.k-battery .pad,.k-system.s-s .pad{align-items:center;justify-content:center}
+.k-battery .pct{font-size:30px;font-weight:600}
+.k-battery.s-m .pad{flex-direction:row;gap:20px;justify-content:flex-start}
+.k-battery .what{font-size:15px;font-weight:650}
+.k-system .two{display:flex;gap:16px}
+.k-system .lab{font-size:11px;font-weight:700;color:var(--dim);text-align:center;margin-top:6px;letter-spacing:.02em}
+.k-system .val{font-size:17px;font-weight:650}
+.k-system .spark{width:100%;height:56px;margin-top:auto}
+.k-system .spark path{fill:none;stroke:var(--green);stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
+.k-system .spark .area{fill:color-mix(in srgb,var(--green) 18%,transparent);stroke:none}
+.k-system .row{display:flex;justify-content:space-between;align-items:baseline}
+.k-system .meter{height:6px;border-radius:3px;background:var(--card2);margin-top:6px;overflow:hidden}.k-system .meter b{display:block;height:100%;border-radius:3px;background:var(--blue);transition:width .6s var(--wl-ease-out)}
+
+/* Claude Code: Pip's face in the colour of what Claude is doing */
+.k-claude{background:#000;color:#fff}
+.k-claude .pip{width:46px;height:38px;border-radius:14px;background:#fff;position:relative;flex:none;box-shadow:0 4px 14px rgba(0,0,0,.4)}
+.k-claude .pip i{position:absolute;top:11px;width:7px;height:13px;border-radius:4px;background:var(--e,#1c1c1e);box-shadow:0 0 8px var(--e,transparent)}
+.k-claude .pip i:first-child{left:12px}.k-claude .pip i:last-child{right:12px}
+.k-claude .st{font-size:16px;font-weight:650;margin-top:auto}
+.k-claude .pr{font-size:12px;color:rgba(255,255,255,.6)}
+.k-claude .q{font-size:12px;color:rgba(255,255,255,.8);margin-top:6px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.k-claude.s-m .pad{flex-direction:row;gap:16px}.k-claude.s-m .body{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center}
+
+/* notes: Apple Notes' yellow title, the text right under it */
+.k-note .cap{color:var(--yellow);display:flex;align-items:center;gap:6px;font-size:12px;text-transform:none;letter-spacing:0}
+.k-note .text{flex:1;margin-top:8px;font-size:13px;line-height:1.35;white-space:pre-wrap;word-break:break-word;overflow:hidden;outline:none;cursor:text;user-select:text}
+.k-note .text:empty::before{content:attr(data-empty);color:var(--dim)}
+
+/* countdown: the days left, big, in its colour */
+.k-countdown .title{font-size:13px;font-weight:650}
+.k-countdown .big{font-size:58px;font-weight:700;color:var(--a,var(--orange));margin-top:auto}
+.k-countdown .unit{font-size:13px;font-weight:600;color:var(--dim)}
+.k-countdown.s-m .pad{flex-direction:row;align-items:flex-end;justify-content:space-between}
+.k-countdown.s-m .when{text-align:right;font-size:12px;color:var(--dim)}
+
+/* your own: a picture, and words over it */
+.k-custom{background:var(--a,var(--card2))}
+.k-custom img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.k-custom .shade{position:absolute;inset:auto 0 0 0;height:70%;background:linear-gradient(transparent,rgba(0,0,0,.6))}
+.k-custom .words{position:absolute;left:16px;right:16px;bottom:14px;color:#fff;text-shadow:0 1px 6px rgba(0,0,0,.35)}
+.k-custom .words b{display:block;font-size:16px;font-weight:700;letter-spacing:-.01em}
+.k-custom .words span{display:block;font-size:12.5px;opacity:.9;margin-top:2px}
+.k-custom.plain .words{color:var(--text);text-shadow:none}
+
+/* edit mode (the place is not locked): the "−" to remove it, as on a Mac */
+.rm{position:absolute;left:-8px;top:-8px;width:22px;height:22px;border-radius:50%;border:0;background:#8e8e93;color:#fff;display:none;place-items:center;cursor:pointer;
+  box-shadow:0 2px 6px rgba(0,0,0,.3);z-index:2;-webkit-app-region:no-drag;transition:transform .2s var(--wl-ease-out)}
+.rm:active{transform:scale(.88);transition-duration:.08s}
+.rm::before{content:"";width:10px;height:2px;border-radius:1px;background:#fff}
+body.editing .rm{display:grid}
+@media (prefers-reduced-motion:reduce){.k-clock .sweep{animation:none}}

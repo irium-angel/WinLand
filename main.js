@@ -18,6 +18,8 @@ require('./media-main.cjs');
 require('./palette-main.cjs');
 require('./queue-main.cjs');
 require('./remote-main.cjs');
+require('./notif-main.cjs'); // Windows notifications only in the island: no banners in the corner, a click opens the app
+require('./widgets-main.cjs'); // desktop widgets, like a Mac's
 require('./companion-main.cjs'); // Pip on the desktop // the phone remote, on your Wi-Fi only (off until you turn it on) // Claude dashboard: tasks Claude Code does one after another // command palette: Alt+Space
 require('./software-main.cjs'); // Software page: FL Studio, VS Code, Steam, Word… only the ones on this PC
 require('./dev-main.cjs'); // Dev page: Git, local servers, dev programs (all read on this PC) // what plays in any music app (Spotify, Apple Music, Deezer…)
@@ -330,9 +332,8 @@ function createMascot() {
 
   mascotWindow.once(
     'ready-to-show',
-
     () => {
-      mascotWindow.showInactive();
+      showIsland(); // not while it is turned off in Settings
     }
   );
 
@@ -378,7 +379,7 @@ ipcMain.on('island:reveal', (event, ms) => {
 //   normal  always there;  hidden  a game fills the screen: gone (and it draws nothing)
 //   peek    a maximized or full-screen window: gone, back while the mouse is at the top edge or on the island
 let presence = 'normal', revealed = false, revealedAt = 0, awayAt = 0, peekTimer = null;
-function showIsland() { if (mascotWindow && !mascotWindow.isDestroyed() && !mascotWindow.isVisible()) mascotWindow.showInactive(); }
+function showIsland() { if (!islandOff && mascotWindow && !mascotWindow.isDestroyed() && !mascotWindow.isVisible()) mascotWindow.showInactive(); }
 function hideIsland() { if (mascotWindow && !mascotWindow.isDestroyed() && mascotWindow.isVisible()) mascotWindow.hide(); }
 // Full-screen players, slideshows and some apps are "always on top" themselves: the island goes above them.
 function raiseIsland() { if (!mascotWindow || mascotWindow.isDestroyed()) return; mascotWindow.setAlwaysOnTop(true, 'screen-saver'); mascotWindow.moveTop(); }
@@ -403,6 +404,14 @@ function applyPresence() {
   else hideIsland();
   if (presence === 'peek') peekTimer = setInterval(peekTick, 50);
 }
+// Settings → Show the island, off: the window stays hidden (it keeps running: the widgets, the phone and the
+// Stream Deck still use it). The tray's "Open the island" turns it back on (tray-main.cjs).
+let islandOff = false;
+ipcMain.on('island:off', (event, off) => {
+  if (!mascotWindow || mascotWindow.isDestroyed() || event.sender !== mascotWindow.webContents) return;
+  islandOff = Boolean(off); app.winlandIslandOff = islandOff;
+  if (islandOff) { clearInterval(peekTimer); peekTimer = null; hideIsland(); } else applyPresence();
+});
 ipcMain.on('island:presence', (event, how) => {
   if (!mascotWindow || mascotWindow.isDestroyed() || event.sender !== mascotWindow.webContents) return;
   if (!['normal', 'peek', 'hidden'].includes(how) || how === presence) return;

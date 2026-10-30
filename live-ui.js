@@ -48,10 +48,14 @@
   // ---------- a card under the island (notifications, reminders, care) ----------
   const style = document.createElement('style'); style.textContent = `
 #winland-card{position:absolute;z-index:80;left:-999px;top:0;width:380px;display:none;gap:12px;align-items:center;padding:12px 16px;border-radius:22px;background:#000;color:#fff;
-  box-shadow:0 16px 40px rgba(0,0,0,.45),0 0 0 1px rgba(255,255,255,.08);font:13px/1.35 Inter,"Segoe UI",sans-serif;pointer-events:none;
+  box-shadow:0 16px 40px rgba(0,0,0,.45),0 0 0 1px rgba(255,255,255,.08);font:13px/1.35 Inter,"Segoe UI",sans-serif;pointer-events:none;cursor:default;
   transform-origin:50% 0;transition:opacity .25s var(--wl-ease-out),transform .55s var(--wl-spring-bounce)}
 #winland-card.in{opacity:1;transform:none}#winland-card:not(.in){opacity:0;transform:scale(.92) translateY(-10px);transition-duration:.18s;transition-timing-function:ease-in-out} /* it leaves the way it came, faster */
-#winland-card .ic{width:36px;height:36px;border-radius:11px;display:grid;place-items:center;flex:none;font-weight:800;font-size:16px;background:var(--c,#2c2c2e)}
+#winland-card .ic{width:36px;height:36px;border-radius:11px;display:grid;place-items:center;flex:none;font-weight:800;font-size:16px;background:var(--c,#2c2c2e);overflow:hidden}
+#winland-card .ic.logo{background:transparent}#winland-card .ic img{width:36px;height:36px;object-fit:contain;display:block}
+/* a notification of an app opens it: the card answers the press like a button */
+#winland-card.open{pointer-events:auto;cursor:pointer}#winland-card.open:active{transform:scale(.97);transition:transform .08s}
+#winland-card .go{flex:none;color:#8e8e93;opacity:0;transition:opacity .15s}#winland-card.open:hover .go{opacity:1}
 #winland-card .tx{min-width:0;flex:1}
 #winland-card small{display:block;color:#a1a1ab;font-size:11px;font-weight:650;letter-spacing:.02em;text-transform:uppercase}
 #winland-card b{display:block;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -66,17 +70,29 @@
   const colourOf = name => COLOURS[[...String(name)].reduce((a, c) => a + c.charCodeAt(0), 0) % COLOURS.length];
   function cardShow(item) { queue.push(item); if (!showing) next(); }
   function next() {
-    showing = queue.shift(); if (!showing) { card.classList.remove('in'); setTimeout(() => { if (!showing) card.style.display = 'none'; }, 300); return; }
+    showing = queue.shift(); if (!showing) { card.classList.remove('in', 'open'); window.__winlandCardRect = null; setTimeout(() => { if (!showing) card.style.display = 'none'; }, 300); return; }
     const c = showing;
-    card.innerHTML = `<div class="ic" style="--c:${c.colour || colourOf(c.app)}">${esc(c.icon || String(c.app || '?').trim()[0]?.toUpperCase() || '•')}</div>
-      <div class="tx"><small>${esc(c.app || 'WinLand')}</small><b>${esc(c.title || '')}</b>${c.body ? `<span>${esc(c.body)}</span>` : ''}</div>`;
+    const logo = /^data:image\/(png|jpeg);base64,[a-z0-9+/=]+$/i.test(c.logo || '') ? c.logo : '';
+    card.innerHTML = `<div class="ic ${logo ? 'logo' : ''}" style="--c:${c.colour || colourOf(c.app)}">${logo ? `<img src="${logo}" alt="">` : esc(c.icon || String(c.app || '?').trim()[0]?.toUpperCase() || '•')}</div>
+      <div class="tx"><small>${esc(c.app || 'WinLand')}</small><b>${esc(c.title || '')}</b>${c.body ? `<span>${esc(c.body)}</span>` : ''}</div>${c.open ? '<svg class="go" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>' : ''}`;
+    card.classList.toggle('open', Boolean(c.open));
     placeCard(); card.style.display = 'flex'; requestAnimationFrame(() => card.classList.add('in'));
     api.revealFor?.(c.ms || 6000); // over a big window the island comes out for the card
     window.__winlandChime?.(c.sound || 'pop');
     clearTimeout(cardTimer); cardTimer = setTimeout(next, c.ms || 6000);
   }
   window.__winlandCard = cardShow;
-  function placeCard() { card.style.left = Math.round(islandBounds.x + islandBounds.width / 2 - 190) + 'px'; card.style.top = Math.round(islandBounds.y + islandBounds.height + 10) + 'px'; }
+  function placeCard() {
+    const x = Math.round(islandBounds.x + islandBounds.width / 2 - 190), y = Math.round(islandBounds.y + islandBounds.height + 10);
+    card.style.left = x + 'px'; card.style.top = y + 'px';
+    window.__winlandCardRect = showing?.open ? { x, y, width: 380, height: card.offsetHeight || 64 } : null; // the island catches the mouse there (mascot.html)
+  }
+  // a click on a notification: its app comes to the front, and the card goes
+  card.addEventListener('click', () => {
+    const c = showing; if (!c?.open) return;
+    api.notifOpen?.(c.open).catch(() => {});
+    clearTimeout(cardTimer); next();
+  });
   function place() { // under the island, wherever it is (started at the end, once everything exists)
     if (card.style.display !== 'none') placeCard();
     placeMic();
@@ -88,7 +104,7 @@
   api.onNotif?.(n => {
     if (prefs().notifIsland === false || window.__winlandDnd?.() || window.__winlandQuiet?.()) return;
     if (/^(winland|electron)$/i.test(String(n?.app || ''))) return; // our own
-    cardShow({ app: n.app, title: n.title, body: n.body, ms: 6500 });
+    cardShow({ app: n.app, title: n.title, body: n.body, logo: n.logo, open: { app: n.app, aumid: n.aumid }, ms: 6500 });
     window.__winlandAutomation?.('notification', n);
   });
 
@@ -158,6 +174,19 @@
   // ---------- Pip on the desktop (companion-main.cjs): follows the setting; a click on him brings him back here ----------
   let onDesk = null;
   setInterval(() => { const on = Boolean(prefs().pipDesk); if (on !== onDesk) { onDesk = on; api.pipDesk?.(on); } }, 1000);
+  // Settings: no island at all, or the notifications only in the island (no banner in the corner); the main
+  // process does both (main.js, notif-main.cjs). With the island off, Windows shows notifications as before.
+  let islandOffSent = null, onlySent = null;
+  const syncMain = () => {
+    const off = prefs().islandOn === false, only = !off && prefs().notifIsland !== false;
+    if (off !== islandOffSent) { islandOffSent = off; api.islandOff?.(off); }
+    if (only !== onlySent) { onlySent = only; api.notifOnlyIsland?.(only); }
+  };
+  syncMain(); setInterval(syncMain, 1000); // at once too: an island turned off does not flash at startup
+  api.onIslandOn?.(() => window.__winlandSetPref?.('islandOn', true));
+  // notifications are off for all of Windows: the island cannot show them until they are on again (once)
+  api.onNotifWindowsOff?.(() => cardShow({ app: 'Windows', icon: '🔕', colour: '#ff9f0a', title: T('Notifications Windows coupées', 'Windows notifications are off'),
+    body: T('Active-les une fois dans Paramètres pour les voir dans l’island (clique ici).', 'Turn them on once in Settings to see them in the island (click here).'), open: { settings: true }, ms: 9000 }));
   api.onPipHome?.(() => { onDesk = false; window.__winlandSetPref?.('pipDesk', false); window.__winlandFeel?.('happy', 1500); window.__winlandChime?.('hello'); flash(`🏝️ ${T('Pip est rentré dans l’island', 'Pip is back in the island')}`, 2000); });
 
   // ---------- Pip takes care of you ----------

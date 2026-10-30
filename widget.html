@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src 'self' data: file:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'">
+<title>WinLand widget</title>
+<link rel="stylesheet" href="./widgets.css">
+<style>
+  html,body{margin:0;background:transparent;overflow:hidden}
+  #slot{position:absolute;left:28px;top:28px}
+  /* the place is not locked: the whole card moves the window (Windows drags it), the "−" removes it */
+  body.editing .wl{-webkit-app-region:drag;cursor:move}
+  body.editing .wl .ctl,body.editing .wl [data-note]{pointer-events:none}
+  body:not(.editing) .wl.clickable:active{transform:scale(.985);transition-duration:.08s}
+</style>
+</head>
+<body>
+<div id="slot"></div>
+<script src="./widgets-render.js"></script>
+<script>
+// One desktop widget (its own small window, owned by the desktop: widgets-main.cjs).
+'use strict';
+const id = new URLSearchParams(location.search).get('id') || '';
+const slot = document.getElementById('slot');
+const still = matchMedia('(prefers-reduced-motion: reduce)');
+let widget = null, ctx = null, battery = null, hasBattery = true;
+
+function editing(on) { document.body.classList.toggle('editing', on); ctx.editing = on; }
+async function start() {
+  const r = await window.wl.get(id); if (!r?.item) return;
+  ctx = { lang: r.lang, state: r.state, system: r.system, agenda: r.agenda, cover: r.cover, still: still.matches, pictureUrl: r.pictures ? name => r.pictures + encodeURIComponent(name) : null, item: r.item };
+  hasBattery = r.hasBattery !== false;
+  if (r.item.kind === 'battery') await watchBattery();
+  widget = WinLandWidgets.mount(slot, r.item, ctx);
+  // the "−" of edit mode sits on the corner, outside the card (which clips what it holds)
+  const rm = document.createElement('button'); rm.className = 'rm'; rm.dataset.remove = ''; rm.setAttribute('aria-label', r.lang === 'en' ? 'Remove' : 'Supprimer'); slot.append(rm);
+  editing(!r.locked); widget.update();
+  if (['clock', 'calendar', 'battery', 'system', 'claude'].includes(r.item.kind)) widget.card.classList.add('clickable');
+  window.wl.onUpdate(u => {
+    if (u.item && u.item.id !== id) return;
+    if ('locked' in u) editing(!u.locked);
+    widget.update(u);
+  });
+  setInterval(() => widget.update({ battery }), 1000); // the clock, the music's time, the countdown at midnight
+}
+// the battery of this PC (Chromium knows it); a desktop PC has none
+async function watchBattery() {
+  try {
+    const b = await navigator.getBattery();
+    const read = () => { battery = { level: b.level, charging: b.charging, chargingTime: b.chargingTime, dischargingTime: b.dischargingTime, none: !hasBattery }; ctx.battery = battery; widget?.update(); };
+    read(); for (const e of ['levelchange', 'chargingchange', 'chargingtimechange', 'dischargingtimechange']) b.addEventListener(e, read);
+  } catch { battery = { none: true }; ctx.battery = battery; }
+}
+
+addEventListener('contextmenu', e => { e.preventDefault(); window.wl.menu(id); });
+addEventListener('click', e => {
+  const t = e.target.closest('button, [data-note]');
+  if (t?.dataset.remove != null) return window.wl.remove(id);
+  if (document.body.classList.contains('editing')) return;
+  if (t?.dataset.do) return window.wl.act(t.dataset.do);
+  if (t?.dataset.note != null) { t.contentEditable = 'plaintext-only'; t.focus(); return; }
+  if (widget?.card.classList.contains('clickable')) window.wl.open(id); // the widget opens its app, as on a Mac
+});
+// a note is saved as you type (a moment after), and when you leave it
+let noteTimer = null;
+addEventListener('input', e => {
+  const t = e.target.closest('[data-note]'); if (!t) return;
+  clearTimeout(noteTimer); noteTimer = setTimeout(() => window.wl.note(id, t.innerText.slice(0, 4000)), 500);
+});
+addEventListener('focusout', e => {
+  const t = e.target.closest('[data-note]'); if (!t) return;
+  clearTimeout(noteTimer); window.wl.note(id, t.innerText.slice(0, 4000)); t.contentEditable = 'false';
+});
+start();
+</script>
+</body>
+</html>

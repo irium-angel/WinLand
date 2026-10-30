@@ -14,7 +14,7 @@
   const DEFAULTS = { lang: 'fr', theme: 'dark', profile: 'custom', quietFullscreen: true, autoHide: true, privacyDot: true, shotsToTray: true, downloadsLive: true, chargeLive: true, breakEvery: 0, clipWarn: false, devWatch: false, speed: 'snel', focusMin: 25, focusSec: 1500,eye: 'mint', body: 'wolk', palette: 'klassiek', faces: true, blink: true,
     dance: true, confetti: true, chimes: true, notify: true, startup: true, sleepMin: 10, warnAt: 80,
     pack: 'verre', volumeHud: true, batteryWarn: true, appAnim: true,
-    notifIsland: true, micButton: true, ocrShots: true, careEyes: false, careWater: false, nightYawn: true, followMouse: false, smartClips: true, pipDesk: false,
+    notifIsland: true, islandOn: true, micButton: true, ocrShots: true, careEyes: false, careWater: false, nightYawn: true, followMouse: false, smartClips: true, pipDesk: false,
     testMode: false, name: 'Pip', lightBusy: '#ff9a1f', lightDone: '#22e05a', lightError: '#ff3b3b' };
   const savedPrefs = store.get('winland:prefs', {});
   if (!savedPrefs.newLook) { savedPrefs.body = 'wolk'; savedPrefs.newLook = true; store.set('winland:prefs', savedPrefs); } // switch once to the new white look
@@ -571,7 +571,7 @@
     row('Pauzeherinnering', 'Een seintje als je zo lang aan het gamen bent', chips('breakEvery', [[0, 'Uit'], [60, '1 uur'], [90, '1,5 uur'], [120, '2 uur']])),
     row('Melding bij oversturing', 'Waarschuwt als het geluid van je pc in het rood gaat, ook in je DAW (pagina Studio)', toggle('clipWarn')),
     row('Batterij-waarschuwing', 'Laptop en Bluetooth (koptelefoon, muis) bijna leeg', toggle('batteryWarn')),
-    row('Notifications in the island', 'Discord, Outlook, Teams… show up in the island instead of the corner of the screen', toggle('notifIsland')),
+    row('Notifications in the island', 'Discord, Outlook, Teams… show up only in the island, with their logo, and a click opens the app. Nothing pops up in the corner of the screen any more', toggle('notifIsland')),
     row('Microphone button', 'During a call: cut the microphone of the whole PC in one click (or Ctrl+Alt+M), with a red dot while it is off', toggle('micButton')),
     row('Text of screenshots', 'The text in a new screenshot goes to the clipboard (Windows reads it on this PC)', toggle('ocrShots')),
     row('Smart clipboard', 'Suggests an action for what you copy: tidy JSON, see a colour, open a path, ask Pip about an error', toggle('smartClips')),
@@ -583,6 +583,9 @@
     row('Pip on the desktop', 'Pip leaves the island and walks on your screen: on the taskbar and on the window in front. Click him to bring him back', toggle('pipDesk')),
     `<div class="tc-setting-row"><div><strong>Alles terugzetten</strong><small>Zet al deze keuzes terug naar standaard</small></div><button type="button" class="tc-toggle" data-pref="reset">Herstel</button></div>`,
     '<div class="tc-group" data-icon="⏻" style="--g:#ff8a8a">WinLand</div>',
+    row('Show the island', 'Off: the island disappears from the top of the screen. WinLand keeps running (widgets, phone, Stream Deck) and Windows shows notifications as before', toggle('islandOn')),
+    '<div class="tc-group" data-icon="🧩" style="--g:#64d2ff">Widgets</div>',
+    row('Desktop widgets', 'Clock, calendar, music, battery, notes, your own pictures… on your desktop, under your windows. Place them, then lock them', '<button type="button" class="tc-chip" data-widgets="1">Open</button>'),
     row('Starten met Windows', 'WinLand start vanzelf als je je pc aanzet', `<button type="button" class="tc-toggle ${loginOn ? 'on' : ''}" data-login="1" aria-pressed="${loginOn}">${loginOn ? 'Aan' : 'Uit'}</button>`),
     row('Opnieuw starten', 'Sluit WinLand en start hem meteen opnieuw', '<button type="button" class="tc-chip" data-restart="1">Herstart</button>'),
     row('Afsluiten', 'Sluit WinLand helemaal af. Kan ook via Pip rechtsonder bij de klok.', '<button type="button" class="tc-chip" data-quit="1">Afsluiten</button>')
@@ -639,6 +642,7 @@
   window.__winlandSettingsAction = target => {
     if (target.dataset.quit) { window.winland?.close?.(); return true; }
     if (target.dataset.restart) { window.winland?.restart?.(); return true; }
+    if (target.dataset.widgets) { window.winland?.widgetsGallery?.(); return true; }
     if (target.dataset.login) { window.winland?.loginSet?.(!loginOn).then(r => { if (r?.ok) loginOn = r.on; rerender(); }).catch(() => {}); return true; }
     if (target.dataset.mood) { feel(target.dataset.mood, 2600); jump(); return true; } // emotion preview in the locker
     if (target.dataset.test) { runTest(target.dataset.test); return true; }

@@ -12,6 +12,7 @@ function island() {
 
 function openIsland() {
   const win = island(); if (!win) return;
+  if (app.winlandIslandOff) { win.webContents.send('island:turn-on'); return; } // turned off in Settings: on again (it shows itself)
   if (win.isMinimized()) win.restore();
   win.showInactive();
   win.webContents.send('extras:shortcut', 'home');
@@ -41,8 +42,8 @@ function firstRun() { try { return JSON.parse(require('node:fs').readFileSync(fi
 // The menu speaks the island's language (the island tells us, preload.js setLang).
 let lang = 'fr';
 const WORDS = {
-  fr: { open: 'Ouvrir l’island', settings: 'Paramètres', login: 'Démarrer avec Windows', restart: 'Redémarrer', quit: 'Quitter WinLand' },
-  en: { open: 'Open the island', settings: 'Settings', login: 'Start with Windows', restart: 'Restart', quit: 'Quit WinLand' }
+  fr: { open: 'Ouvrir l’island', settings: 'Paramètres', widgets: 'Widgets…', lock: 'Verrouiller les widgets', login: 'Démarrer avec Windows', restart: 'Redémarrer', quit: 'Quitter WinLand' },
+  en: { open: 'Open the island', settings: 'Settings', widgets: 'Widgets…', lock: 'Lock the widgets', login: 'Start with Windows', restart: 'Restart', quit: 'Quit WinLand' }
 };
 
 function buildMenu() {
@@ -53,12 +54,16 @@ function buildMenu() {
     { type: 'separator' },
     { label: w.open, accelerator: 'Ctrl+Alt+1', registerAccelerator: false, click: openIsland },
     { label: w.settings, click: () => app.emit('winland-open-settings') },
+    { label: w.widgets, click: () => app.winlandWidgets?.gallery() }, // desktop widgets (widgets-main.cjs)
+    ...(app.winlandWidgets?.count() ? [{ label: w.lock, type: 'checkbox', checked: app.winlandWidgets.locked(), click: item => app.winlandWidgets.setLocked(item.checked) }] : []),
     { label: w.login, type: 'checkbox', checked: startsWithWindows(), click: item => setStartsWithWindows(item.checked) },
     { type: 'separator' },
     { label: w.restart, click: restart },
     { label: w.quit, click: quit }
   ]));
 }
+
+app.on('winland-tray-refresh', () => buildMenu()); // the widgets changed (their lock, their number)
 
 if (!app.requestSingleInstanceLock()) {
   // WinLand already runs: that one opens its island, this one stops right away.
