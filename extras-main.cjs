@@ -63,7 +63,7 @@ function setup(electron) {
   handle('extras:outputs', async () => ({ outputs: await askOutputs('outputs') }));
   // ---------- notifications, the microphone for the whole PC, OCR and the colour picker (winland-helper) ----------
   let notifAccess = '', micMuted = false;
-  const answers = { pixel: [], ocr: [], agenda: [], rect: [] };
+  const answers = { pixel: [], ocr: [], agenda: [], rect: [], appicon: [] };
   const ask = (kind, line, wait = 8000) => new Promise(done => {
     if (!volumeChild?.stdin) return done(null);
     answers[kind].push(done); volumeChild.stdin.write(line + '\n');
@@ -74,6 +74,8 @@ function setup(electron) {
   // for the Stream Deck (remote-main.cjs): a line for the helper (keys, type, set, mute, micmute) and the volume now
   app.winlandHelper = line => { if (!volumeChild?.stdin || /[\r\n]/.test(line)) return false; volumeChild.stdin.write(line + '\n'); return true; };
   app.winlandVolumeNow = () => volumeNow;
+  // the logo of a program, shortcut, file or folder, 128 px (a Stream Deck button): a data: URL, or '' when there is none
+  app.winlandAppIcon = async file => { const r = await ask('appicon', 'appicon ' + Buffer.from(String(file), 'utf8').toString('base64'), 8000); return r && r !== '-' ? 'data:image/png;base64,' + r : ''; };
   handle('extras:mic-get', async () => ({ muted: micMuted, notifications: notifAccess }));
   handle('extras:mic-set', async payload => { setMic(Boolean(payload?.muted)); return {}; });
   handle('extras:idle', async () => ({ seconds: electron.powerMonitor.getSystemIdleTime() })); // how long nobody touched the PC (automations)
@@ -210,7 +212,7 @@ function setup(electron) {
         if (level === 'notif-access') { notifAccess = muted; continue; }
         if (level === 'micmute') { micMuted = muted === '1'; send('extras:micmute', { muted: micMuted, known: muted !== '-' }); continue; }
         if (level === 'front') { screenTime.front(muted); send('extras:front', muted); continue; } // the program in front (screen time, automations)
-        if (level === 'pixel' || level === 'ocr' || level === 'agenda' || level === 'rect') { answers[level].splice(0).forEach(done => done(muted)); continue; }
+        if (level === 'pixel' || level === 'ocr' || level === 'agenda' || level === 'rect' || level === 'appicon') { answers[level].splice(0).forEach(done => done(muted)); continue; }
         if (level !== undefined && level !== '') { volumeNow = { level: Number(level), muted: muted === '1' }; send('extras:volume', volumeNow); }
       }
     });

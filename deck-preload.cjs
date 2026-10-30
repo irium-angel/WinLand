@@ -6,6 +6,7 @@ contextBridge.exposeInMainWorld('deckApp', {
   reset: () => ipcRenderer.invoke('deck:reset'),
   lists: () => ipcRenderer.invoke('deck:lists'),
   tryAction: action => ipcRenderer.invoke('deck:try', action),
+  logo: req => ipcRenderer.invoke('deck:logo', req), // { kind: 'app', name } or { path }
   pick: folder => ipcRenderer.invoke('deck:pick', { folder: folder === true }),
   scriptsFolder: () => ipcRenderer.invoke('deck:scripts-folder')
 });

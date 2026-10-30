@@ -1,72 +1,147 @@
 <!doctype html>
-<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-<meta name="theme-color" content="#0b0b0f"><title>WinLand</title>
-<!-- WinLand on your phone (remote-main.cjs serves it on your Wi-Fi). First the 6-digit code shown in WinLand, then the
-     remote or the Stream Deck. The phone's own secret stays in this browser; it never sees what a deck button does. -->
+<html lang="fr"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#0b0b0f"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="WinLand">
+<link rel="manifest" href="/manifest.webmanifest"><link rel="apple-touch-icon" href="/icon.png"><link rel="icon" href="/icon.png">
+<title>WinLand</title>
+<!-- WinLand on your phone or tablet (remote-main.cjs serves it on your Wi-Fi). First the 6-digit code shown in WinLand,
+     then the remote or the Stream Deck. The Stream Deck fits any screen: it works out how many buttons fit at a good
+     size, and spreads the rest over screens you swipe through. The phone never sees what a button does. -->
 <script src="/icons.js"></script>
 <style>
   *{box-sizing:border-box;margin:0;-webkit-tap-highlight-color:transparent}
-  :root{--bg:#0b0b0f;--card:#16161c;--card2:#1f1f27;--line:rgba(255,255,255,.07);--text:#f5f5f7;--dim:#8e8e98;--accent:#4f8cff;--ok:#30d158;--bad:#ff453a;--warn:#ff9f0a}
-  html,body{background:var(--bg);color:var(--text);font:15px/1.4 -apple-system,"SF Pro Text","Segoe UI",Roboto,sans-serif}
-  body{padding:max(16px,env(safe-area-inset-top)) 16px max(24px,env(safe-area-inset-bottom));min-height:100vh;-webkit-user-select:none;user-select:none}
+  [hidden]{display:none!important} /* the pager, the page tabs, the top bar's buttons: really gone when hidden */
+  :root{--bg:#0b0b0f;--card:#16161c;--card2:#22222b;--line:rgba(255,255,255,.08);--text:#f5f5f7;--dim:#8e8e98;--accent:#4f8cff;--ok:#30d158;--bad:#ff453a;--warn:#ff9f0a;
+    --st:env(safe-area-inset-top);--sb:env(safe-area-inset-bottom);--sl:env(safe-area-inset-left);--sr:env(safe-area-inset-right)}
+  html,body{height:100%;background:var(--bg);color:var(--text);font:15px/1.4 -apple-system,"SF Pro Text","Segoe UI",Roboto,sans-serif;overscroll-behavior:none}
+  body{display:flex;flex-direction:column;height:100dvh;padding:max(10px,var(--st)) max(12px,var(--sr)) max(10px,var(--sb)) max(12px,var(--sl));-webkit-user-select:none;user-select:none;overflow:hidden}
   svg{display:block;flex:none}
-  header{display:flex;align-items:center;gap:12px;margin-bottom:16px}
-  .logo{width:38px;height:34px;border-radius:11px;background:linear-gradient(#fff,#dedee6);position:relative;flex:none}
-  .logo i{position:absolute;top:10px;width:6px;height:12px;border-radius:4px;background:var(--e,#1c1c1e);transition:background .3s}
-  .logo i:first-child{left:11px}.logo i:last-child{right:11px}
-  h1{font-size:19px;letter-spacing:-.3px;font-weight:700}
-  #sub{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--dim)}
-  #sub b{width:7px;height:7px;border-radius:50%;background:var(--dim)}#sub.on b{background:var(--ok)}#sub.off b{background:var(--bad)}
-  .seg{display:grid;grid-template-columns:1fr 1fr;background:var(--card);border-radius:12px;padding:3px;margin-bottom:14px}
-  .seg button{height:36px;border:0;border-radius:9px;background:none;color:var(--dim);font:600 14px inherit;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:7px}
+  button{font-family:inherit;color:inherit;cursor:pointer}
+  /* top bar */
+  .top{display:flex;align-items:center;gap:10px;height:44px;flex:none;margin-bottom:10px}
+  .logo{width:32px;height:28px;border-radius:9px;background:linear-gradient(#fff,#dedee6);position:relative;flex:none}
+  .logo i{position:absolute;top:8px;width:5px;height:11px;border-radius:3px;background:var(--e,#1c1c1e);transition:background .3s}
+  .logo i:first-child{left:9px}.logo i:last-child{right:9px}
+  .seg{flex:1;max-width:420px;display:grid;grid-template-columns:1fr 1fr;background:var(--card);border-radius:12px;padding:3px;margin:0 auto}
+  .seg button{height:34px;border:0;border-radius:9px;background:none;color:var(--dim);font:600 13.5px inherit;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:7px;white-space:nowrap}
   .seg button.on{background:var(--card2);color:var(--text)}
-  .card{background:var(--card);border-radius:18px;padding:14px;margin-bottom:10px}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--dim);flex:none}.dot.on{background:var(--ok)}.dot.off{background:var(--bad)}
+  .iconbtn{width:36px;height:36px;border:0;border-radius:10px;background:var(--card);display:grid;place-items:center;color:var(--dim);flex:none}
+  #view{flex:1;min-height:0;display:flex;flex-direction:column}
+  /* menu */
+  .menu{position:fixed;top:calc(max(10px,var(--st)) + 50px);right:max(12px,var(--sr));z-index:20;background:#1c1c22;border-radius:14px;padding:6px;min-width:230px;box-shadow:0 20px 50px rgba(0,0,0,.6);display:none}
+  .menu.on{display:block}
+  .menu button{width:100%;height:42px;border:0;background:none;border-radius:9px;display:flex;align-items:center;gap:10px;padding:0 12px;font:500 14.5px inherit;font-family:inherit;text-align:left}
+  .menu button:active{background:var(--card2)}.menu .bad{color:#ff6961}
+  .menu p{color:var(--dim);font-size:12px;padding:6px 12px 8px}
+  /* remote */
+  .scroll{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:6px}
+  .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px;align-items:start}
+  .card{background:var(--card);border-radius:18px;padding:14px}
   .cap{display:flex;align-items:center;gap:7px;font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--dim);font-weight:600;margin-bottom:8px}
   .title{font-size:17px;font-weight:650;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .line{color:var(--dim);font-size:13.5px;margin-top:3px;word-break:break-word;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
   .lamp{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:8px;background:#55555f;vertical-align:1px}
   .row{display:flex;gap:8px;margin-top:12px}
-  .btn{flex:1;height:48px;border:0;border-radius:13px;background:var(--card2);color:var(--text);font:600 15px inherit;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px}
-  .btn:active,.key:active{transform:scale(.96)}
+  .btn{flex:1;height:48px;border:0;border-radius:13px;background:var(--card2);font:600 15px inherit;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;min-width:0}
+  .btn:active{transform:scale(.96)}
   .btn.ok{background:var(--ok);color:#04130a}.btn.bad{background:var(--bad)}.btn.main{background:var(--accent)}.btn.on{background:rgba(255,69,58,.18);color:#ff6961}
   .chips{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
-  .chip{height:62px;border:0;border-radius:13px;background:var(--card2);color:var(--dim);font:600 12px inherit;font-family:inherit;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px}
+  .chip{height:60px;border:0;border-radius:13px;background:var(--card2);color:var(--dim);font:600 12px inherit;font-family:inherit;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px}
   .chip.on{background:rgba(79,140,255,.18);color:#8db4ff}
   /* Stream Deck */
-  .pages{display:flex;gap:6px;overflow-x:auto;margin-bottom:10px;scrollbar-width:none}
-  .pages button{flex:none;height:32px;padding:0 14px;border:0;border-radius:16px;background:var(--card);color:var(--dim);font:600 13px inherit;font-family:inherit}
+  .pages{display:flex;gap:6px;overflow-x:auto;flex:none;margin-bottom:10px;scrollbar-width:none;justify-content:safe center}
+  .pages::-webkit-scrollbar{display:none}
+  .pages button{flex:none;height:32px;padding:0 14px;border:0;border-radius:16px;background:var(--card);color:var(--dim);font:600 13px inherit;font-family:inherit;white-space:nowrap}
   .pages button.on{background:var(--text);color:#000}
-  .deck{display:grid;gap:9px}
-  .key{aspect-ratio:1;border:0;border-radius:16px;background:var(--c,#2c2c2e);color:#fff;font:600 11.5px inherit;font-family:inherit;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:6px;
-    box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 2px 8px rgba(0,0,0,.35);transition:transform .08s,filter .2s;overflow:hidden}
-  .key span{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .stage{flex:1;min-height:0;position:relative;touch-action:pan-y}
+  .deck{position:absolute;display:grid}
+  .key{border:0;border-radius:var(--r,18px);background:var(--c,#2c2c2e);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:var(--g,6px);padding:6px;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.1),0 3px 10px rgba(0,0,0,.35);transition:transform .08s,filter .15s;overflow:hidden;min-width:0;min-height:0;position:relative}
+  .key svg{width:var(--i,28px);height:var(--i,28px)}
+  .key img{width:var(--img,40px);height:var(--img,40px);object-fit:contain;filter:drop-shadow(0 2px 4px rgba(0,0,0,.35));pointer-events:none}
+  .key span{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;font-size:var(--f,12px);line-height:1.15}
   .key.light{color:#111}.key.empty{background:transparent;box-shadow:inset 0 0 0 1.5px var(--line)}
-  .key.done{filter:brightness(1.35)}.key.fail{animation:shake .3s}
-  @keyframes shake{25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
-  /* pairing */
-  .pair{max-width:380px;margin:9vh auto 0;text-align:center}
-  .pair .big{width:64px;height:64px;border-radius:20px;background:var(--card);display:grid;place-items:center;margin:0 auto 18px;color:var(--accent)}
-  .pair h2{font-size:22px;letter-spacing:-.4px}.pair p{color:var(--dim);margin-top:8px;font-size:14.5px}
-  .code{margin:26px auto 14px;width:100%;height:64px;border:0;border-radius:16px;background:var(--card);color:var(--text);text-align:center;font:700 30px ui-monospace,"SF Mono",Menlo,monospace;letter-spacing:.45em;padding-left:.45em;outline:none}
-  .code:focus{box-shadow:0 0 0 2px var(--accent)}
+  .key:active{transform:scale(.94);filter:brightness(1.15)}
+  .key.done::after{content:"";position:absolute;inset:0;border-radius:inherit;box-shadow:inset 0 0 0 3px rgba(255,255,255,.75);animation:fade .45s forwards}
+  .key.fail{animation:shake .3s}
+  @keyframes fade{to{opacity:0}}@keyframes shake{25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
+  .pager{flex:none;height:44px;display:flex;align-items:center;justify-content:center;gap:14px;margin-top:8px}
+  .pager button{width:44px;height:36px;border:0;border-radius:11px;background:var(--card);display:grid;place-items:center;color:var(--text)}
+  .pager button:disabled{opacity:.3}
+  .dots{display:flex;gap:6px}.dots i{width:7px;height:7px;border-radius:50%;background:#3a3a44;transition:.2s}.dots i.on{background:var(--text);width:18px;border-radius:4px}
+  .note{color:var(--dim);text-align:center;padding:24px 8px;font-size:14px}
+  /* first visit on this device: welcome, the code, connected */
+  body.onboard .top{display:none}
+  .ob{flex:1;min-height:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:clamp(14px,4vh,30px);position:relative;overflow:hidden;text-align:center}
+  .ob::before{content:"";position:absolute;width:520px;height:520px;left:50%;top:38%;transform:translate(-50%,-50%);background:radial-gradient(closest-side,rgba(79,140,255,.22),rgba(124,92,255,.08) 55%,transparent);pointer-events:none;animation:breathe 6s ease-in-out infinite}
+  .ob[data-step="done"]::before{background:radial-gradient(closest-side,rgba(48,209,88,.25),rgba(48,209,88,.06) 55%,transparent)}
+  @keyframes breathe{50%{transform:translate(-50%,-50%) scale(1.08)}}
+  .pip{width:clamp(76px,22vw,104px);aspect-ratio:1.12;border-radius:30%;background:linear-gradient(#fff,#dcdce6);position:relative;flex:none;box-shadow:0 18px 50px rgba(0,0,0,.45),inset 0 -4px 10px rgba(0,0,0,.08);
+    animation:float 4s ease-in-out infinite;transition:transform .5s cubic-bezier(.3,1.4,.5,1)}
+  .pip i{position:absolute;top:30%;width:12%;height:34%;border-radius:40% / 25%;background:#1c1c1e;animation:blink 4.2s infinite,look 7s ease-in-out infinite;transition:height .25s,top .25s,border-radius .25s,background .25s}
+  .pip i:first-child{left:28%}.pip i:last-child{right:28%}
+  .pip.wait i{animation:hop .6s ease-in-out infinite}.pip.wait i:last-child{animation-delay:.12s}
+  .pip.happy i{height:12%;top:40%;border-radius:50% 50% 0 0 / 100% 100% 0 0;background:#1c1c1e;animation:none}
+  .pip.sad{animation:shake .4s}
+  .pip.happy{transform:scale(1.08)}
+  @keyframes float{50%{translate:0 -8px}}@keyframes blink{0%,46%,50%,100%{scale:1 1}48%{scale:1 .1}}@keyframes look{0%,30%,100%{translate:0 0}40%,55%{translate:-28% 0}65%,80%{translate:28% 0}}
+  @keyframes hop{50%{translate:0 -30%}}
+  .ob-steps{position:relative;width:min(100%,400px);flex:none}
+  .step{display:flex;flex-direction:column;align-items:center;gap:10px;width:100%}
+  .step:not(.on){display:none}
+  .step.on>*{animation:rise .5s cubic-bezier(.2,.9,.3,1) both}.step.on>*:nth-child(2){animation-delay:.06s}.step.on>*:nth-child(3){animation-delay:.12s}.step.on>*:nth-child(4){animation-delay:.18s}.step.on>*:nth-child(5){animation-delay:.24s}.step.on>*:nth-child(6){animation-delay:.3s}
+  @keyframes rise{from{opacity:0;transform:translateY(14px)}}
+  .ob h1{font-size:clamp(28px,8vw,36px);letter-spacing:-.8px;font-weight:800}
+  .ob h2{font-size:24px;letter-spacing:-.5px;font-weight:750}
+  .ob p{color:var(--dim);font-size:15px;max-width:330px}
+  .feats{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin:6px 0 4px}
+  .feats span{display:flex;align-items:center;gap:6px;height:32px;padding:0 12px;border-radius:16px;background:var(--card);color:#c9c9d2;font-size:12.5px;font-weight:600}
+  .cta{width:100%;height:54px;border:0;border-radius:16px;background:linear-gradient(135deg,#5b8cff,#7c5cff);color:#fff;font:650 16px inherit;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:9px;box-shadow:0 10px 30px rgba(91,140,255,.35);margin-top:8px}
+  .cta:active{transform:scale(.97)}
+  .back{position:absolute;left:0;top:-4px;width:40px;height:40px;border:0;border-radius:12px;background:var(--card);display:grid;place-items:center;color:var(--dim)}
+  .boxes{position:relative;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:clamp(6px,2vw,10px);width:100%;max-width:360px;margin:12px 0 2px}
+  .boxes input{position:absolute;inset:0;width:100%;height:100%;opacity:0;border:0;font-size:16px;-webkit-user-select:text;user-select:text;caret-color:transparent}
+  .box{aspect-ratio:.82;border-radius:14px;background:var(--card);box-shadow:inset 0 0 0 1.5px var(--line);display:grid;place-items:center;font:700 clamp(24px,7vw,30px) ui-monospace,"SF Mono",Menlo,monospace;transition:box-shadow .2s,background .3s,transform .2s}
+  .box.cur{box-shadow:inset 0 0 0 2px var(--accent)}
+  .box.cur:empty::after{content:"";width:2px;height:40%;background:var(--accent);animation:caret 1s steps(1) infinite}
+  .box.full{animation:pop .22s ease-out}
+  .boxes.wait .box{animation:pulse 1s ease-in-out infinite}.boxes.wait .box:nth-child(2){animation-delay:.08s}.boxes.wait .box:nth-child(3){animation-delay:.16s}.boxes.wait .box:nth-child(4){animation-delay:.24s}.boxes.wait .box:nth-child(5){animation-delay:.32s}.boxes.wait .box:nth-child(6){animation-delay:.4s}
+  .boxes.good .box{background:rgba(48,209,88,.16);box-shadow:inset 0 0 0 2px var(--ok);color:#7ef0a0}
+  .boxes.bad .box{box-shadow:inset 0 0 0 2px var(--bad);color:#ff8a80}.boxes.bad{animation:shake .4s}
+  @keyframes caret{50%{opacity:0}}@keyframes pop{50%{transform:scale(1.12)}}@keyframes pulse{50%{background:var(--card2);transform:translateY(-3px)}}
   .err{color:var(--warn);font-size:13.5px;min-height:20px}
-  .foot{margin-top:18px;text-align:center}.foot button{border:0;background:none;color:var(--dim);font:500 13px inherit;font-family:inherit;padding:8px}
-  .empty-note{color:var(--dim);text-align:center;padding:24px 8px;font-size:14px}
+  .hint{display:flex;align-items:center;gap:8px;color:var(--dim);font-size:12.5px;background:var(--card);border-radius:12px;padding:9px 12px;text-align:left}
+  .tick{width:84px;height:84px}
+  .tick circle{stroke:var(--ok);stroke-width:5;fill:rgba(48,209,88,.12);stroke-dasharray:252;stroke-dashoffset:252;animation:draw .55s ease-out forwards}
+  .tick path{stroke:#fff;stroke-width:6;fill:none;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:60;stroke-dashoffset:60;animation:draw .35s .45s ease-out forwards}
+  @keyframes draw{to{stroke-dashoffset:0}}
+  #view.enter{animation:enter .55s cubic-bezier(.2,.9,.3,1) both}
+  @keyframes enter{from{opacity:0;transform:scale(.96)}}
+  @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
+  @media (max-height:500px){ /* a phone on its side: everything smaller */
+    .top{height:38px;margin-bottom:6px}.seg button{height:30px}.iconbtn{width:32px;height:32px}
+    .pages{margin-bottom:6px}.pages button{height:28px}.pager{height:36px;margin-top:6px}.pager button{height:30px}
+    .ob{flex-direction:row;gap:28px}.ob::before{top:50%;left:25%}.feats{display:none}.cta{height:48px}.boxes{margin:6px 0 0}.box{aspect-ratio:1}
+  }
 </style></head>
 <body>
-<header><div class="logo" id="logo"><i></i><i></i></div><div><h1>WinLand</h1><div id="sub"><b></b><span id="subText">…</span></div></div></header>
-<div id="app"></div>
+<div class="top"><div class="logo" id="logo"><i></i><i></i></div><div class="seg" id="seg" hidden></div><span class="dot" id="dot" title=""></span><button class="iconbtn" id="more" aria-label="Menu" hidden></button></div>
+<div id="view"></div>
+<div class="menu" id="menu"></div>
 <script>
 const I = (name, size = 20) => window.WinLandIcons ? WinLandIcons.svg(name, size) : '';
 const fr = !/^en/i.test(navigator.language || '');
 const T = (a, b) => fr ? a : b;
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const store = { get: k => { try { return localStorage.getItem(k) || ''; } catch { return ''; } }, set: (k, v) => { try { v ? localStorage.setItem(k, v) : localStorage.removeItem(k); } catch {} } };
-let TOKEN = store.get('winland-token'), view = store.get('winland-view') || 'remote', last = null, deckData = null, deckPage = 0, timer = null;
+let TOKEN = store.get('winland-token'), view = store.get('winland-view') || 'deck', last = null, deck = null, deckPage = Number(store.get('winland-page')) || 0, screen = 0, timer = null;
 const COLOURS = { running: '#ff9f0a', question: '#ff9f0a', done: '#30d158', error: '#ff453a' };
 const STATES = { running: T('Claude travaille', 'Claude is working'), question: T('Claude attend ta réponse', 'Claude is waiting for you'), done: T('Claude a fini', 'Claude is done'), error: T('Erreur', 'Error'), ready: T('Prêt', 'Ready') };
-const $app = document.getElementById('app');
-function status(text, kind) { document.getElementById('subText').textContent = text; document.getElementById('sub').className = kind || ''; }
+const $ = id => document.getElementById(id);
+const status = (text, kind) => { $('dot').className = 'dot ' + (kind || ''); $('dot').title = text; };
+const vibrate = ms => { try { navigator.vibrate?.(ms); } catch {} };
 
 async function call(path, body) {
   const r = await fetch(path, { method: body ? 'POST' : 'GET', headers: { 'X-WinLand-Token': TOKEN, 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined, cache: 'no-store' });
@@ -75,54 +150,106 @@ async function call(path, body) {
   return data;
 }
 
-// ---------- pairing ----------
+// ---------- first visit on this device: welcome → the code → connected ----------
+const wait = ms => new Promise(r => setTimeout(r, ms));
 function pairScreen(message) {
-  clearInterval(timer); status(T('Pas encore connecté', 'Not connected yet'), 'off');
-  $app.innerHTML = `<div class="pair"><div class="big">${I('lock', 30)}</div>
-    <h2>${T('Entre le code', 'Enter the code')}</h2>
-    <p>${T('Il s’affiche dans WinLand, sur la page Téléphone.', 'It is shown in WinLand, on the Phone page.')}</p>
-    <input class="code" id="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="······" aria-label="${T('Code à 6 chiffres', '6-digit code')}">
-    <div class="err" id="err">${esc(message || '')}</div>
-    <div class="row"><button class="btn main" id="go">${I('check', 18)}${T('Connecter', 'Connect')}</button></div></div>`;
-  const input = document.getElementById('code');
-  input.addEventListener('input', () => { input.value = input.value.replace(/\D/g, '').slice(0, 6); if (input.value.length === 6) pair(input.value); });
-  document.getElementById('go').addEventListener('click', () => pair(input.value));
-  setTimeout(() => input.focus(), 200);
+  clearInterval(timer); status(T('Pas encore connecté', 'Not connected yet'), 'off'); $('seg').hidden = true; $('more').hidden = true;
+  document.body.classList.add('onboard'); $('view').classList.remove('enter');
+  $('view').innerHTML = `<div class="ob" id="ob" data-step="welcome"><div class="pip" id="pip"><i></i><i></i></div>
+    <div class="ob-steps">
+      <section class="step" data-step="welcome">
+        <h1>WinLand</h1>
+        <p>${T('Ton PC au bout des doigts : un Stream Deck et une télécommande, sur ton Wi-Fi.', 'Your PC at your fingertips: a Stream Deck and a remote, on your Wi-Fi.')}</p>
+        <div class="feats"><span>${I('grid', 15)}Stream Deck</span><span>${I('remote', 15)}${T('Télécommande', 'Remote')}</span><span>${I('lock', 15)}${T('Privé', 'Private')}</span></div>
+        <button class="cta" data-ob="start">${T('Connecter cet appareil', 'Connect this device')}${I('chevron-right', 18)}</button>
+      </section>
+      <section class="step" data-step="code">
+        <button class="back" data-ob="back" aria-label="${T('Retour', 'Back')}">${I('chevron-left', 20)}</button>
+        <h2>${T('Entre le code', 'Enter the code')}</h2>
+        <p>${T('Sur ton PC : WinLand, page Téléphone.', 'On your PC: WinLand, Phone page.')}</p>
+        <div class="boxes" id="boxes">${'<div class="box"></div>'.repeat(6)}<input id="code" inputmode="numeric" pattern="[0-9]*" autocomplete="one-time-code" maxlength="6" aria-label="${T('Code à 6 chiffres', '6-digit code')}"></div>
+        <div class="err" id="err" role="alert"></div>
+        <div class="hint">${I('phone', 16)}${T('Le code change toutes les 5 minutes et ne sert qu’une fois.', 'The code changes every 5 minutes and works once.')}</div>
+      </section>
+      <section class="step" data-step="done">
+        <svg class="tick" viewBox="0 0 84 84"><circle cx="42" cy="42" r="38"/><path d="M26 43l11 11 21-23"/></svg>
+        <h2>${T('Connecté', 'Connected')}</h2>
+        <p id="pcName"></p>
+      </section>
+    </div></div>`;
+  const input = $('code');
+  input.addEventListener('input', () => { input.value = input.value.replace(/\D/g, '').slice(0, 6); boxes(); if (input.value.length === 6) pair(input.value); });
+  input.addEventListener('focus', boxes); input.addEventListener('blur', boxes);
+  step(message ? 'code' : 'welcome');
+  if (message) $('err').textContent = message;
+}
+function step(name) {
+  const ob = $('ob'); if (!ob) return;
+  ob.dataset.step = name;
+  ob.querySelectorAll('.step').forEach(s => s.classList.toggle('on', s.dataset.step === name));
+  if (name === 'code') setTimeout(() => $('code')?.focus(), 250);
+}
+// the six boxes follow the hidden field (typing, pasting, the code the keyboard suggests)
+function boxes() {
+  const input = $('code'), v = input.value, focused = document.activeElement === input;
+  [...$('boxes').querySelectorAll('.box')].forEach((b, i) => {
+    const d = v[i] || ''; if (b.textContent !== d) { b.textContent = d; b.classList.remove('full'); if (d) { void b.offsetWidth; b.classList.add('full'); } }
+    b.classList.toggle('cur', focused && i === Math.min(v.length, 5));
+  });
 }
 async function pair(code) {
-  const err = document.getElementById('err');
+  const err = $('err'), box = $('boxes'), pip = $('pip'), input = $('code');
   if (!/^\d{6}$/.test(code)) { err.textContent = T('Le code a 6 chiffres.', 'The code has 6 digits.'); return; }
-  const name = /iphone/i.test(navigator.userAgent) ? 'iPhone' : /ipad/i.test(navigator.userAgent) ? 'iPad' : /android/i.test(navigator.userAgent) ? 'Android' : T('Téléphone', 'Phone');
-  try {
-    const r = await fetch('/api/pair', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code, name }), cache: 'no-store' }).then(x => x.json());
-    if (r.ok && r.token) { TOKEN = r.token; store.set('winland-token', TOKEN); if (navigator.vibrate) navigator.vibrate(20); show(view); return; }
-    document.getElementById('code').value = '';
-    err.textContent = r.error === 'locked' ? T(`Trop d’essais : attends ${r.wait} s.`, `Too many tries: wait ${r.wait} s.`)
-      : r.left === 0 ? T('Trop d’essais : un nouveau code s’affiche dans WinLand.', 'Too many tries: WinLand shows a new code.') : T('Ce n’est pas le bon code.', 'That is not the right code.');
-  } catch { err.textContent = T('PC injoignable (même Wi-Fi ? télécommande allumée ?)', 'PC unreachable (same Wi-Fi? remote on?)'); }
+  const ua = navigator.userAgent, name = /iphone/i.test(ua) ? 'iPhone' : /ipad|macintosh.*mobile/i.test(ua) ? 'iPad' : /android.*mobile/i.test(ua) ? 'Android' : /android/i.test(ua) ? T('Tablette Android', 'Android tablet') : T('Téléphone', 'Phone');
+  err.textContent = ''; input.blur(); input.disabled = true; box.className = 'boxes wait'; pip.className = 'pip wait';
+  let r = null;
+  try { [r] = await Promise.all([fetch('/api/pair', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code, name }), cache: 'no-store' }).then(x => x.json()), wait(700)]); } // long enough to see it check
+  catch { r = { error: 'net' }; }
+  if (r?.ok && r.token) { // hop: connected
+    TOKEN = r.token; store.set('winland-token', TOKEN);
+    box.className = 'boxes good'; pip.className = 'pip happy'; vibrate([18, 60, 30]);
+    await wait(450); const pc = /^(desktop|laptop|pc)-[a-z0-9]+$/i.test(r.pc || '') ? '' : r.pc; $('pcName').textContent = pc ? T(`à ${pc}`, `to ${pc}`) : T('à ton PC', 'to your PC'); // Windows' own DESKTOP-XXXX name says nothing step('done');
+    await wait(1400); document.body.classList.remove('onboard'); show(view); $('view').classList.add('enter');
+    return;
+  }
+  box.className = 'boxes bad'; pip.className = 'pip sad'; vibrate([40, 40, 40]);
+  err.textContent = r?.error === 'net' ? T('PC injoignable : même Wi-Fi ? Télécommande allumée dans WinLand ?', 'PC unreachable: same Wi-Fi? Remote on in WinLand?')
+    : r?.error === 'locked' ? T(`Trop d’essais : attends ${r.wait} s.`, `Too many tries: wait ${r.wait} s.`)
+    : r?.left === 0 ? T('Trop d’essais : un nouveau code s’affiche dans WinLand.', 'Too many tries: WinLand shows a new code.') : T('Ce n’est pas le bon code.', 'That is not the right code.');
+  await wait(650); box.className = 'boxes'; pip.className = 'pip'; input.disabled = false; input.value = ''; boxes(); input.focus();
 }
 
-// ---------- the two modes ----------
-function frame(inner) {
-  return `<div class="seg"><button data-view="remote" class="${view === 'remote' ? 'on' : ''}">${I('remote', 17)}${T('Télécommande', 'Remote')}</button><button data-view="deck" class="${view === 'deck' ? 'on' : ''}">${I('grid', 17)}Stream Deck</button></div>
-    <div id="body">${inner}</div><div class="foot"><button data-forget="1">${T('Déconnecter ce téléphone', 'Disconnect this phone')}</button></div>`;
-}
+// ---------- the frame: the two modes, the menu ----------
 function show(next) {
-  view = next === 'deck' ? 'deck' : 'remote'; store.set('winland-view', view);
-  $app.innerHTML = frame(''); clearInterval(timer);
-  if (view === 'remote') { loadState(); timer = setInterval(loadState, 2000); } else { loadDeck(); timer = setInterval(() => { if (!document.hidden) loadDeck(true); }, 5000); } // every 5 s: the buttons you change on the PC arrive here
+  view = next === 'remote' ? 'remote' : 'deck'; store.set('winland-view', view);
+  $('seg').hidden = false; $('more').hidden = false;
+  $('seg').innerHTML = `<button data-view="deck" class="${view === 'deck' ? 'on' : ''}">${I('grid', 16)}Stream Deck</button><button data-view="remote" class="${view === 'remote' ? 'on' : ''}">${I('remote', 16)}${T('Télécommande', 'Remote')}</button>`;
+  $('more').innerHTML = `<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>`;
+  clearInterval(timer); $('view').innerHTML = '';
+  if (view === 'remote') { $('view').innerHTML = `<div class="scroll"><div class="cards" id="cards"></div></div>`; loadState(); timer = setInterval(loadState, 2000); }
+  else { buildDeckView(); loadDeck(); timer = setInterval(() => { if (!document.hidden) loadDeck(true); }, 4000); }
+}
+function menu(open) {
+  const m = $('menu'); if (!open) { m.classList.remove('on'); return; }
+  const canFull = document.documentElement.requestFullscreen && !document.fullscreenElement;
+  const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone;
+  m.innerHTML = `${canFull ? `<button data-m="full">${I('monitor', 18)}${T('Plein écran', 'Full screen')}</button>` : ''}
+    <button data-m="reload">${I('refresh', 18)}${T('Recharger les boutons', 'Reload the buttons')}</button>
+    <button data-m="forget" class="bad">${I('x', 18)}${T('Déconnecter ce téléphone', 'Disconnect this phone')}</button>
+    ${standalone ? '' : `<p>${T('Astuce : « Ajouter à l’écran d’accueil » dans le menu du navigateur, pour l’ouvrir comme une app.', 'Tip: “Add to Home Screen” in the browser menu, to open it like an app.')}</p>`}`;
+  m.classList.add('on');
 }
 const lost = e => { if (e.message === 'pair') pairScreen(T('Ce téléphone a été déconnecté. Entre un nouveau code.', 'This phone was disconnected. Enter a new code.')); else status(T('PC injoignable', 'PC unreachable'), 'off'); };
 
 // ---------- remote ----------
 async function loadState() { try { const s = await call('/api/state'); if (view === 'remote') drawRemote(s); status(T('Connecté à ton PC', 'Connected to your PC'), 'on'); } catch (e) { lost(e); } }
 function drawRemote(s) {
-  const c = s.claude || {}, m = s.music || {}, f = s.focus || {}, body = document.getElementById('body'); if (!body) return;
-  document.getElementById('logo').style.setProperty('--e', COLOURS[c.state] || '#1c1c1e');
+  const c = s.claude || {}, m = s.music || {}, f = s.focus || {}, box = $('cards'); if (!box) return;
+  $('logo').style.setProperty('--e', COLOURS[c.state] || '#1c1c1e');
   const ask = c.permission ? `<div class="card"><div class="cap">${I('bell', 14)}${T('Claude demande', 'Claude asks')}</div><div class="title">${esc(c.permission)}</div>${c.permissionDetail ? `<div class="line">${esc(c.permissionDetail)}</div>` : ''}
       <div class="row"><button class="btn ok" data-a="allow">${I('check', 18)}${T('Autoriser', 'Allow')}</button><button class="btn bad" data-a="deny">${I('x', 18)}${T('Refuser', 'Deny')}</button></div></div>` : '';
   const MODES = [['normal', 'home', 'Normal', 'Normal'], ['meeting', 'users', 'Réunion', 'Meeting'], ['night', 'moon', 'Nuit', 'Night'], ['stream', 'broadcast', 'Stream', 'Stream']];
-  body.innerHTML = `${ask}
+  box.innerHTML = `${ask}
     <div class="card"><div class="cap">${I('claude', 14)}Claude Code</div><div class="title"><span class="lamp" style="background:${COLOURS[c.state] || '#55555f'}"></span>${esc(STATES[c.state] || T('Rien en cours', 'Nothing running'))}</div>${c.project ? `<div class="line">${esc(c.project)}${c.detail ? ' · ' + esc(c.detail) : ''}</div>` : ''}${c.question ? `<div class="line">${esc(c.question)}</div>` : ''}</div>
     <div class="card"><div class="cap">${I('music', 14)}${T('Musique', 'Music')}</div><div class="title">${esc(m.title || T('Rien ne joue', 'Nothing playing'))}</div>${m.artist ? `<div class="line">${esc(m.artist)}</div>` : ''}
       <div class="row"><button class="btn" data-a="previous" aria-label="${T('Précédent', 'Previous')}">${I('prev')}</button><button class="btn main" data-a="${m.playing ? 'pause' : 'play'}" aria-label="${m.playing ? 'Pause' : T('Lecture', 'Play')}">${I(m.playing ? 'pause' : 'play')}</button><button class="btn" data-a="next" aria-label="${T('Suivant', 'Next')}">${I('next')}</button></div></div>
@@ -132,37 +259,102 @@ function drawRemote(s) {
 }
 
 // ---------- Stream Deck ----------
+function buildDeckView() {
+  $('view').innerHTML = `<div class="pages" id="pages" hidden></div><div class="stage" id="stage"></div><div class="pager" id="pager" hidden>
+    <button id="prevScreen" aria-label="${T('Écran précédent', 'Previous screen')}">${I('chevron-left', 20)}</button><div class="dots" id="dots"></div><button id="nextScreen" aria-label="${T('Écran suivant', 'Next screen')}">${I('chevron-right', 20)}</button></div>`;
+  new ResizeObserver(() => layout()).observe($('stage'));
+  swipe($('stage'));
+}
 async function loadDeck(quiet) {
-  try { const r = await call('/api/deck'), same = JSON.stringify(r.deck) === JSON.stringify(deckData); deckData = r.deck; if (view === 'deck' && (!same || !document.querySelector('.deck'))) drawDeck(); status(T('Connecté à ton PC', 'Connected to your PC'), 'on'); }
-  catch (e) { if (!quiet || e.message === 'pair') lost(e); } // disconnected from the PC: always back to the code
+  try {
+    const r = await call('/api/deck' + (deck ? `?rev=${deck.rev}` : ''));
+    if (r.deck) { deck = r.deck; layout(); }
+    status(T('Connecté à ton PC', 'Connected to your PC'), 'on');
+  } catch (e) { if (!quiet || e.message === 'pair') lost(e); } // disconnected from the PC: always back to the code
 }
 const isLight = hex => { const n = parseInt(String(hex || '#000').slice(1), 16); return ((n >> 16) * 299 + ((n >> 8) & 255) * 587 + (n & 255) * 114) / 1000 > 170; };
-function drawDeck() {
-  const body = document.getElementById('body'); if (!body || !deckData) return;
-  const d = deckData; deckPage = Math.min(deckPage, d.pages.length - 1); const p = d.pages[deckPage];
-  const tabs = d.pages.length > 1 ? `<div class="pages">${d.pages.map((x, i) => `<button data-page="${i}" class="${i === deckPage ? 'on' : ''}">${esc(x.name)}</button>`).join('')}</div>` : '';
-  const keys = p.buttons.map((k, i) => k ? `<button class="key ${isLight(k.colour) ? 'light' : ''}" style="--c:${esc(k.colour)}" data-key="${i}" ${k.go != null ? `data-go="${k.go}"` : ''}>${I(k.icon, 28)}<span>${esc(k.label)}</span></button>` : `<div class="key empty"></div>`).join('');
-  body.innerHTML = `${tabs}<div class="deck" style="grid-template-columns:repeat(${d.cols},1fr)">${keys}</div>${p.buttons.some(Boolean) ? '' : `<div class="empty-note">${T('Cette page est vide : crée tes boutons dans WinLand (page Téléphone, Stream Deck).', 'This page is empty: make your buttons in WinLand (Phone page, Stream Deck).')}</div>`}`;
+// How the buttons fit this screen. The grid made on the PC is kept when its buttons are big enough here; otherwise
+// the buttons flow into the grid that fits (as big as possible), over several screens when needed.
+function plan(W, H, d, items) {
+  const short = Math.min(innerWidth, innerHeight), minKey = short < 500 ? 70 : 92, maxKey = short < 500 ? 150 : 190;
+  const gap = Math.round(Math.max(8, Math.min(16, Math.min(W, H) * 0.025)));
+  const sizeFor = (cols, rows, h) => Math.min((W - gap * (cols - 1)) / cols, (h - gap * (rows - 1)) / rows);
+  const kept = sizeFor(d.cols, d.rows, H);
+  if (kept >= minKey) return { cols: d.cols, rows: d.rows, key: Math.min(maxKey, kept), gap, kept: true, screens: 1 };
+  const n = Math.max(1, items.length);
+  let best = null; // everything on one screen?
+  for (let cols = 1; cols <= n; cols++) { const rows = Math.ceil(n / cols), key = sizeFor(cols, rows, H); if (key >= minKey && (!best || key > best.key)) best = { cols, rows, key }; }
+  if (best) return { ...best, key: Math.min(maxKey, best.key), gap, kept: false, screens: 1 };
+  const pagerH = innerHeight < 500 ? 42 : 52, h = H - pagerH; // several screens: the most buttons that still fit at a good size
+  const cols = Math.max(1, Math.floor((W + gap) / (minKey + gap))), rows = Math.max(1, Math.floor((h + gap) / (minKey + gap)));
+  return { cols, rows, key: Math.min(maxKey, sizeFor(cols, rows, h)), gap, kept: false, screens: Math.ceil(n / (cols * rows)) };
+}
+function keyHtml(k, i) {
+  if (!k) return `<div class="key empty"></div>`;
+  const pic = k.image ? `<img src="${esc(k.image)}" alt="">` : I(k.icon, 28);
+  return `<button class="key ${!k.image && isLight(k.colour) ? 'light' : ''}" style="--c:${esc(k.image && k.colour === '#2c2c2e' ? '#1f1f26' : k.colour)}" data-key="${i}" ${k.go != null ? `data-go="${k.go}"` : ''} aria-label="${esc(k.label)}">${pic}${k.label ? `<span>${esc(k.label)}</span>` : ''}</button>`;
+}
+function layout() {
+  const stage = $('stage'); if (!stage || !deck) return;
+  deckPage = Math.max(0, Math.min(deckPage, deck.pages.length - 1));
+  const page = deck.pages[deckPage], pages = $('pages');
+  pages.hidden = deck.pages.length < 2;
+  if (!pages.hidden) pages.innerHTML = deck.pages.map((x, i) => `<button data-page="${i}" class="${i === deckPage ? 'on' : ''}">${esc(x.name)}</button>`).join('');
+  const pager = $('pager'), W = stage.clientWidth, H0 = stage.clientHeight + (pager.hidden ? 0 : pager.offsetHeight + 8); // the room with no pager
+  const items = page.buttons.map((k, i) => ({ k, i })).filter(x => x.k);
+  if (!items.length) { pager.hidden = true; stage.innerHTML = `<div class="note">${T('Cette page est vide : crée tes boutons dans WinLand (page Téléphone, bouton Stream Deck).', 'This page is empty: make your buttons in WinLand (Phone page, Stream Deck button).')}</div>`; return; }
+  const usedRows = Math.ceil((items[items.length - 1].i + 1) / deck.cols); // the empty rows at the end take no room
+  const p = plan(W, H0, { cols: deck.cols, rows: usedRows }, items);
+  if (pager.hidden !== (p.screens < 2)) { pager.hidden = p.screens < 2; return requestAnimationFrame(layout); } // the pager takes its row only when there are several screens
+  screen = Math.max(0, Math.min(screen, p.screens - 1));
+  const per = p.cols * p.rows, shown = p.kept ? page.buttons.slice(0, usedRows * deck.cols).map((k, i) => ({ k, i })) : items.slice(screen * per, screen * per + per);
+  const key = Math.floor(p.key), gridW = p.cols * key + (p.cols - 1) * p.gap, gridH = p.rows * key + (p.rows - 1) * p.gap, H = stage.clientHeight;
+  const g = document.createElement('div'); g.className = 'deck';
+  Object.assign(g.style, { gridTemplateColumns: `repeat(${p.cols},${key}px)`, gridAutoRows: `${key}px`, gap: `${p.gap}px`, left: `${Math.round((W - gridW) / 2)}px`, top: `${Math.max(0, Math.round((H - gridH) / 2))}px` });
+  for (const [name, value] of [['--r', key * 0.2], ['--i', key * 0.34], ['--img', key * 0.46], ['--f', Math.max(10, Math.min(15, key * 0.12))], ['--g', key * 0.06]]) g.style.setProperty(name, `${Math.round(value)}px`);
+  g.innerHTML = shown.map(x => keyHtml(x.k, x.i)).join('');
+  stage.replaceChildren(g);
+  if (!pager.hidden) {
+    $('dots').innerHTML = Array.from({ length: p.screens }, (_, i) => `<i class="${i === screen ? 'on' : ''}"></i>`).join('');
+    $('prevScreen').disabled = screen === 0; $('nextScreen').disabled = screen >= p.screens - 1;
+  }
+  layout.screens = p.screens;
+}
+function go(dir) { const next = screen + dir; if (next < 0 || next >= (layout.screens || 1)) return; screen = next; vibrate(8); layout(); }
+function swipe(el) { // swipe left / right: the next or previous screen
+  let x0 = null, y0 = 0;
+  el.addEventListener('touchstart', e => { x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; }, { passive: true });
+  el.addEventListener('touchend', e => { if (x0 == null) return; const dx = e.changedTouches[0].clientX - x0, dy = e.changedTouches[0].clientY - y0; x0 = null; if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) go(dx < 0 ? 1 : -1); }, { passive: true });
 }
 async function press(button) {
-  if (button.dataset.go != null) { deckPage = Number(button.dataset.go) || 0; drawDeck(); return; }
-  if (navigator.vibrate) navigator.vibrate(12);
-  try { const r = await call('/api/press', { page: deckPage, index: Number(button.dataset.key) }); button.classList.add(r.ok ? 'done' : 'fail'); setTimeout(() => button.classList.remove('done', 'fail'), 350); }
+  if (button.dataset.go != null) { deckPage = Number(button.dataset.go) || 0; store.set('winland-page', String(deckPage)); screen = 0; return layout(); }
+  vibrate(12);
+  try { const r = await call('/api/press', { page: deckPage, index: Number(button.dataset.key) }); button.classList.remove('done', 'fail'); void button.offsetWidth; button.classList.add(r.ok ? 'done' : 'fail'); setTimeout(() => button.classList.remove('done', 'fail'), 500); }
   catch (e) { lost(e); }
 }
 
 // ---------- taps ----------
 document.addEventListener('click', async e => {
-  const t = e.target.closest('button'); if (!t) return;
+  const t = e.target.closest('button');
+  if (!e.target.closest('#menu') && !e.target.closest('#more')) menu(false);
+  if (!t) return;
+  if (t.dataset.ob === 'start') return step('code');
+  if (t.dataset.ob === 'back') return step('welcome');
+  if (t.id === 'more') return menu(!$('menu').classList.contains('on'));
+  if (t.dataset.m === 'full') { menu(false); document.documentElement.requestFullscreen?.().catch(() => {}); return; }
+  if (t.dataset.m === 'reload') { menu(false); deck = null; return loadDeck(); }
+  if (t.dataset.m === 'forget') { menu(false); try { await call('/api/forget', {}); } catch {} TOKEN = ''; store.set('winland-token', ''); return pairScreen(''); }
   if (t.dataset.view) return show(t.dataset.view);
-  if (t.dataset.page != null) { deckPage = Number(t.dataset.page); return drawDeck(); }
+  if (t.dataset.page != null) { deckPage = Number(t.dataset.page); store.set('winland-page', String(deckPage)); screen = 0; return layout(); }
+  if (t.id === 'prevScreen') return go(-1);
+  if (t.id === 'nextScreen') return go(1);
   if (t.dataset.key != null) return press(t);
-  if (t.dataset.forget) { try { await call('/api/forget', {}); } catch {} TOKEN = ''; store.set('winland-token', ''); return pairScreen(''); }
   if (t.dataset.a) {
-    const a = t.dataset.a; if (navigator.vibrate) navigator.vibrate(12);
+    const a = t.dataset.a; vibrate(12);
     try { await call('/api/do', { kind: a, value: t.dataset.v || '', sessionId: a === 'allow' || a === 'deny' ? last?.claude?.sessionId : '' }); setTimeout(loadState, 400); } catch (err) { lost(err); }
   }
 });
+document.addEventListener('keydown', e => { if (view === 'deck' && e.key === 'ArrowRight') go(1); if (view === 'deck' && e.key === 'ArrowLeft') go(-1); });
 document.addEventListener('visibilitychange', () => { if (!document.hidden && TOKEN) show(view); });
 if (TOKEN) show(view); else pairScreen('');
 </script>

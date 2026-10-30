@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="fr"><head><meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'unsafe-inline'; script-src 'self' 'unsafe-inline'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'unsafe-inline'; script-src 'self' 'unsafe-inline'; img-src 'self' data:">
 <title>WinLand Stream Deck</title>
 <!-- The Stream Deck editor (deck-main.cjs): pages of buttons for the phone. Each change is saved right away. -->
 <script src="deck-icons.js"></script>
@@ -31,6 +31,8 @@
   .grid{display:grid;gap:10px}
   .key{aspect-ratio:1;border-radius:16px;background:var(--c,#2c2c2e);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:6px;font-weight:600;font-size:11.5px;
     border:0;box-shadow:inset 0 1px 0 rgba(255,255,255,.08);position:relative;overflow:hidden}
+  .key img{width:46%;height:46%;object-fit:contain;filter:drop-shadow(0 2px 4px rgba(0,0,0,.35));pointer-events:none}
+  .check{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--text);cursor:pointer}.check input{width:16px;height:16px;accent-color:var(--accent)}
   .key span{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .key.light{color:#111}
   .key.empty{background:transparent;box-shadow:inset 0 0 0 1.5px var(--line);color:#4a4b52}
@@ -104,7 +106,7 @@ function draw() {
   $('#tabs').innerHTML = deck.pages.map((p, i) => `<button class="tab ${i === page ? 'on' : ''}" data-tab="${i}" title="${esc(p.name)}">${esc(p.name)}</button>`).join('');
   $('#cols').value = deck.cols; $('#rows').value = deck.rows;
   const g = $('#grid'); g.style.gridTemplateColumns = `repeat(${deck.cols},1fr)`;
-  g.innerHTML = buttons().map((k, i) => k ? `<button class="key ${isLight(k.colour) ? 'light' : ''} ${i === sel ? 'sel' : ''}" style="--c:${esc(k.colour)}" data-i="${i}" draggable="true">${I(k.icon, 28)}<span>${esc(k.label)}</span></button>`
+  g.innerHTML = buttons().map((k, i) => k ? `<button class="key ${!k.image && isLight(k.colour) ? 'light' : ''} ${i === sel ? 'sel' : ''}" style="--c:${esc(k.colour)}" data-i="${i}" draggable="true">${k.image ? `<img src="${esc(k.image)}" alt="">` : I(k.icon, 28)}<span>${esc(k.label)}</span></button>`
     : `<button class="key empty ${i === sel ? 'sel' : ''}" data-i="${i}">${I('plus', 22)}</button>`).join('');
   side();
 }
@@ -126,16 +128,25 @@ $('#rows').addEventListener('change', e => resize(deck.cols, Number(e.target.val
 
 // ---------- the inspector ----------
 const opt = (pairs, value) => pairs.map(([v, label]) => `<option value="${esc(v)}" ${String(v) === String(value ?? '') ? 'selected' : ''}>${esc(label)}</option>`).join('');
+const logoField = a => (a.name || a.path) ? `<label class="check"><input type="checkbox" data-logo="1" ${buttons()[sel]?.image ? 'checked' : ''}>${T('Utiliser son logo', 'Use its logo')}</label>` : '';
+// the app's (or file's) own logo on the button, and its name as the label when there is none yet
+async function fetchLogo(k, setLabel) {
+  const a = k.action, r = await window.deckApp.logo(a.kind === 'app' ? { kind: 'app', name: a.name } : { path: a.path });
+  if (buttons()[sel] !== k) return;
+  if (r?.ok) { k.image = r.image; if (k.colour === KINDS[a.kind][2]) k.colour = '#2c2c2e'; } else delete k.image;
+  if (setLabel && !k.label) k.label = String(a.kind === 'app' ? a.name : (a.path || '').split(/[\\/]/).pop()).slice(0, 30);
+  changed();
+}
 function actionFields(a) {
   switch (a.kind) {
     case 'media': return `<div class="field"><label>${T('Commande', 'Command')}</label><select data-a="op">${opt([['playpause', T('Lecture / pause', 'Play / pause')], ['next', T('Suivant', 'Next')], ['prev', T('Précédent', 'Previous')]], a.op || 'playpause')}</select></div>`;
     case 'volume': return `<div class="field"><label>${T('Commande', 'Command')}</label><div class="row"><select data-a="op">${opt([['up', T('Monter', 'Up')], ['down', T('Baisser', 'Down')], ['mute', T('Couper / remettre', 'Mute / unmute')], ['set', T('Régler à', 'Set to')]], a.op || 'up')}</select>
       ${a.op === 'mute' ? '' : `<input data-a="value" type="number" min="1" max="100" placeholder="${a.op === 'set' ? '%' : T('pas : 5', 'step: 5')}" value="${esc(a.value || '')}">`}</div></div>`;
-    case 'app': return `<div class="field"><label>${T('App (menu Démarrer)', 'App (Start menu)')}</label><input data-a="name" list="appsList" placeholder="${T('Tape le nom…', 'Type its name…')}" value="${esc(a.name || '')}"><datalist id="appsList">${lists.apps.map(n => `<option value="${esc(n)}">`).join('')}</datalist></div>`;
+    case 'app': return `<div class="field"><label>${T('App (menu Démarrer)', 'App (Start menu)')}</label><input data-a="name" list="appsList" placeholder="${T('Tape le nom…', 'Type its name…')}" value="${esc(a.name || '')}"><datalist id="appsList">${lists.apps.map(n => `<option value="${esc(n)}">`).join('')}</datalist></div>${logoField(a)}`;
     case 'script': return `<div class="field"><label>Script</label><select data-a="name"><option value="">—</option>${opt(lists.scripts.map(n => [n, n]), a.name)}</select>
       <button class="ghost" data-do="scripts">${I('folder', 15)}${T('Ouvrir le dossier des scripts', 'Open the scripts folder')}</button><span class="note">${T('.ps1, .cmd, .bat, .js (Bun) ou .py', '.ps1, .cmd, .bat, .js (Bun) or .py')}</span></div>`;
     case 'url': return `<div class="field"><label>${T('Lien', 'Link')}</label><input data-a="url" placeholder="https://… , spotify:… , ms-settings:…" value="${esc(a.url || '')}"></div>`;
-    case 'open': return `<div class="field"><label>${T('Fichier ou dossier', 'File or folder')}</label><input data-a="path" placeholder="C:\\…" value="${esc(a.path || '')}"><div class="row"><button class="ghost" data-do="file">${I('file', 15)}${T('Fichier…', 'File…')}</button><button class="ghost" data-do="folder">${I('folder', 15)}${T('Dossier…', 'Folder…')}</button></div></div>`;
+    case 'open': return `<div class="field"><label>${T('Fichier ou dossier', 'File or folder')}</label><input data-a="path" placeholder="C:\\…" value="${esc(a.path || '')}"><div class="row"><button class="ghost" data-do="file">${I('file', 15)}${T('Fichier…', 'File…')}</button><button class="ghost" data-do="folder">${I('folder', 15)}${T('Dossier…', 'Folder…')}</button></div></div>${logoField(a)}`;
     case 'keys': return `<div class="field"><label>${T('Raccourci', 'Shortcut')}</label><input class="keycap" data-a="keys" data-capture="1" readonly placeholder="${T('Clique ici puis fais le raccourci', 'Click here, then press the shortcut')}" value="${esc(a.keys || '')}">
       <span class="note">${T('Il est tapé dans la fenêtre au premier plan (ex. ctrl+shift+m pour couper Teams, f9, win+d).', 'It goes to the window in front (e.g. ctrl+shift+m to mute Teams, f9, win+d).')}</span></div>`;
     case 'text': return `<div class="field"><label>${T('Texte', 'Text')}</label><textarea data-a="text" placeholder="${T('Tapé dans la fenêtre au premier plan', 'Typed in the window in front')}">${esc(a.text || '')}</textarea></div>`;
@@ -173,9 +184,10 @@ $('#side').addEventListener('change', e => {
     const [, icon, colour] = KINDS[t.value], was = KINDS[k.action.kind];
     if (!k.icon || k.icon === was[1] || k.icon === 'star') k.icon = icon;
     if (!k.colour || k.colour === was[2] || k.colour === '#2c2c2e') k.colour = colour;
-    k.action = { kind: t.value }; return changed();
+    k.action = { kind: t.value }; delete k.image; return changed();
   }
-  if (t.dataset.a) { k.action[t.dataset.a] = t.value; return changed(t.dataset.a === 'op'); }
+  if (t.dataset.logo) { if (t.checked) fetchLogo(k, false); else { delete k.image; changed(); } return; }
+  if (t.dataset.a) { k.action[t.dataset.a] = t.value; if ((t.dataset.a === 'name' && k.action.kind === 'app') || t.dataset.a === 'path') return fetchLogo(k, true); return changed(t.dataset.a === 'op'); }
   if (t.dataset.label != null) { k.label = t.value; return changed(); }
 });
 $('#side').addEventListener('input', e => { const t = e.target, k = sel >= 0 ? buttons()[sel] : null; if (k && (t.dataset.a || t.dataset.label != null) && t.tagName !== 'SELECT' && !t.dataset.capture) { if (t.dataset.a) k.action[t.dataset.a] = t.value; else k.label = t.value; changed(false); $('#grid').querySelector(`[data-i="${sel}"] span`)?.replaceChildren(k.label); } });
@@ -191,12 +203,12 @@ $('#side').addEventListener('keydown', e => {
 });
 $('#side').addEventListener('click', async e => {
   const b = e.target.closest('button'); if (!b) return; const k = sel >= 0 ? buttons()[sel] : null;
-  if (b.dataset.icon && k) { k.icon = b.dataset.icon; return changed(); }
+  if (b.dataset.icon && k) { k.icon = b.dataset.icon; delete k.image; return changed(); } // an icon chosen: it replaces the logo
   if (b.dataset.colour && k) { k.colour = b.dataset.colour; return changed(); }
   const what = b.dataset.do;
   if (what === 'try' && k) { const r = await window.deckApp.tryAction(k.action); toast(r?.ok ? T('Fait', 'Done') : T('Ça n’a pas marché : vérifie les réglages du bouton', 'That did not work: check the button’s settings')); }
   else if (what === 'clear' && k) { buttons()[sel] = null; sel = -1; changed(); }
-  else if ((what === 'file' || what === 'folder') && k) { const r = await window.deckApp.pick(what === 'folder'); if (r?.ok) { k.action.path = r.path; if (!k.label) k.label = r.path.split(/[\\/]/).pop().slice(0, 30); changed(); } }
+  else if ((what === 'file' || what === 'folder') && k) { const r = await window.deckApp.pick(what === 'folder'); if (r?.ok) { k.action.path = r.path; fetchLogo(k, true); } }
   else if (what === 'scripts') { await window.deckApp.scriptsFolder(); setTimeout(async () => { lists = { ...lists, ...(await window.deckApp.lists()) }; draw(); }, 4000); }
   else if (what === 'delPage' && deck.pages.length > 1 && confirm(T('Supprimer cette page et ses boutons ?', 'Delete this page and its buttons?'))) { deck.pages.splice(page, 1); page = Math.max(0, page - 1); changed(); }
   else if (what === 'reset' && confirm(T('Remplacer tout ton Stream Deck par celui de départ ?', 'Replace your whole Stream Deck with the starting one?'))) { const r = await window.deckApp.reset(); if (r?.ok) { deck = r.deck; page = 0; sel = -1; draw(); } }

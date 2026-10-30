@@ -47,6 +47,8 @@ function lanAddress() {
 // ---------- the server ----------
 const page = () => fs.readFileSync(path.join(__dirname, 'remote-phone.html'), 'utf8');
 const icons = fs.readFileSync(path.join(__dirname, 'deck-icons.js'), 'utf8');
+const appIcon = fs.readFileSync(path.join(__dirname, 'assets', 'icon-256.png'));
+const MANIFEST = JSON.stringify({ name: 'WinLand', short_name: 'WinLand', start_url: '/', scope: '/', display: 'standalone', background_color: '#0b0b0f', theme_color: '#0b0b0f', icons: [{ src: '/icon.png', sizes: '256x256', type: 'image/png', purpose: 'any' }] });
 let server = null, state = {}, error = '';
 const HEAD = { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer' };
 const json = (res, status, body) => { res.writeHead(status, { ...HEAD, 'Content-Type': 'application/json' }); res.end(JSON.stringify(body)); };
@@ -62,9 +64,12 @@ function start() {
   server = http.createServer(async (req, res) => {
     const url = String(req.url).split('?')[0];
     if (req.method === 'GET' && (url === '/' || url === '/index.html')) { // the page itself holds no secret
-      res.writeHead(200, { ...HEAD, 'Content-Type': 'text/html; charset=utf-8', 'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self'; img-src data:" });
+      res.writeHead(200, { ...HEAD, 'Content-Type': 'text/html; charset=utf-8', 'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self'; img-src data: 'self'; manifest-src 'self'" });
       return res.end(page());
     }
+    // "Add to Home Screen": it opens like an app, full screen, with WinLand's icon
+    if (req.method === 'GET' && url === '/manifest.webmanifest') { res.writeHead(200, { ...HEAD, 'Content-Type': 'application/manifest+json' }); return res.end(MANIFEST); }
+    if (req.method === 'GET' && url === '/icon.png') { res.writeHead(200, { ...HEAD, 'Cache-Control': 'max-age=86400', 'Content-Type': 'image/png' }); return res.end(appIcon); }
     if (req.method === 'GET' && url === '/icons.js') { res.writeHead(200, { ...HEAD, 'Content-Type': 'text/javascript; charset=utf-8' }); return res.end(icons); }
     if (req.method === 'POST' && url === '/api/pair') {
       const body = await readBody(req), now = Date.now();
@@ -78,14 +83,17 @@ function start() {
       devices.push({ id: crypto.randomBytes(4).toString('hex'), name: String(body?.name || 'Téléphone').replace(/[^\w\s\-'.À-ÿ]/g, '').slice(0, 40) || 'Téléphone', hash: hash(token), at: now, seen: now });
       devices = devices.slice(-10); saveDevices(); newCode(); // a code works once
       island()?.webContents.send('remote:changed');
-      return json(res, 200, { ok: true, token });
+      return json(res, 200, { ok: true, token, pc: os.hostname() }); // the phone shows which PC it is now connected to
     }
     if (!url.startsWith('/api/')) { res.writeHead(404, HEAD); return res.end(); }
     const device = deviceOf(req);
     if (!device) { req.resume(); return json(res, 403, { ok: false, error: 'pair' }); }
     if (Date.now() - device.seen > 60000) { device.seen = Date.now(); saveDevices(); }
     if (req.method === 'GET' && url === '/api/state') return json(res, 200, { ok: true, ...state, at: Date.now() });
-    if (req.method === 'GET' && url === '/api/deck') return json(res, 200, { ok: true, deck: deck.phoneDeck() });
+    if (req.method === 'GET' && url === '/api/deck') { // the phone says which version it has: the logos are sent again only after a change
+      const d = deck.phoneDeck(), has = new URLSearchParams(String(req.url).split('?')[1] || '').get('rev');
+      return json(res, 200, has !== null && Number(has) === d.rev ? { ok: true, same: true } : { ok: true, deck: d });
+    }
     if (req.method === 'POST' && url === '/api/do') { // the remote's own buttons
       const action = await readBody(req);
       const kinds = ['allow', 'deny', 'play', 'pause', 'next', 'previous', 'focus', 'mic', 'mode'];

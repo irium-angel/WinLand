@@ -76,7 +76,8 @@ app.winlandLaunch = {
   open: (kind, name) => {
     const list = build()[kind] || [], item = list.find(x => x.name === name) || list.find(x => x.name.toLowerCase() === String(name).toLowerCase());
     return item ? openItem(kind, item, {}) : { ok: false, error: 'missing' };
-  }
+  },
+  pathOf: (kind, name) => (build()[kind] || []).find(x => x.name === name)?.path || ''
 };
 ipcMain.handle('palette:scripts-folder', async e => { if (!fromIsland(e)) return null; build(); await shell.openPath(scriptsDir()); return { ok: true }; });
 

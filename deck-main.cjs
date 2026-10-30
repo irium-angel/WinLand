@@ -36,15 +36,17 @@ function clean(deck) {
   const cols = Math.max(2, Math.min(6, Number(deck?.cols) || 4)), rows = Math.max(1, Math.min(5, Number(deck?.rows) || 3));
   const pages = (Array.isArray(deck?.pages) ? deck.pages : []).slice(0, 12).map((p, i) => ({
     name: str(p?.name || `Page ${i + 1}`, 30),
-    buttons: Array.from({ length: cols * rows }, (_, j) => { const x = p?.buttons?.[j]; return x && x.action ? { label: str(x.label, 30), icon: str(x.icon, 30), colour: COLOURS.includes(x.colour) || /^#[0-9a-f]{6}$/i.test(x.colour || '') ? x.colour : COLOURS[0], action: cleanAction(x.action) } : null; })
+    buttons: Array.from({ length: cols * rows }, (_, j) => { const x = p?.buttons?.[j]; return x && x.action ? { label: str(x.label, 30), icon: str(x.icon, 30), colour: COLOURS.includes(x.colour) || /^#[0-9a-f]{6}$/i.test(x.colour || '') ? x.colour : COLOURS[0], action: cleanAction(x.action),
+      ...(typeof x.image === 'string' && x.image.length < 90000 && /^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(x.image) ? { image: x.image } : {}) } : null; }) // image: the app's own logo
   }));
-  return { cols, rows, pages: pages.length ? pages : clean(DEFAULT).pages };
+  return { cols, rows, rev: Number(deck?.rev) || 0, pages: pages.length ? pages : clean(DEFAULT).pages };
 }
 let deck = null;
 function getDeck() { if (!deck) { try { deck = clean(JSON.parse(fs.readFileSync(file(), 'utf8'))); } catch { deck = clean(DEFAULT); } } return deck; }
-function setDeck(next) { deck = clean(next); try { fs.writeFileSync(file(), JSON.stringify(deck, null, 1)); } catch {} return deck; }
+// rev: the phone downloads the deck (and its logos) again only when it changed
+function setDeck(next) { deck = clean({ ...next, rev: (getDeck().rev || 0) + 1 }); try { fs.writeFileSync(file(), JSON.stringify(deck)); } catch {} return deck; }
 // what the phone sees: never the links, paths, texts or keys behind the buttons
-const phoneDeck = () => { const d = getDeck(); return { cols: d.cols, rows: d.rows, pages: d.pages.map(p => ({ name: p.name, buttons: p.buttons.map(x => x && { label: x.label, icon: x.icon, colour: x.colour, go: x.action?.kind === 'page' ? Number(x.action.page) || 0 : null }) })) }; };
+const phoneDeck = () => { const d = getDeck(); return { rev: d.rev, cols: d.cols, rows: d.rows, pages: d.pages.map(p => ({ name: p.name, buttons: p.buttons.map(x => x && { label: x.label, icon: x.icon, colour: x.colour, image: x.image || '', go: x.action?.kind === 'page' ? Number(x.action.page) || 0 : null }) })) }; };
 
 // ---------- doing what a button says ----------
 const helper = line => app.winlandHelper?.(line);
@@ -101,6 +103,13 @@ ipcMain.handle('deck:set', (e, next) => { if (!fromEditor(e)) return null; const
 ipcMain.handle('deck:reset', e => fromEditor(e) ? { ok: true, deck: setDeck(DEFAULT) } : null);
 ipcMain.handle('deck:lists', e => fromEditor(e) ? { ok: true, ...(app.winlandLaunch?.lists() || { apps: [], scripts: [], projects: [] }) } : null);
 ipcMain.handle('deck:try', (e, action) => fromEditor(e) ? run(action) : null);
+// the logo for a button: an app of the Start menu (by name) or a file or folder
+ipcMain.handle('deck:logo', async (e, req) => {
+  if (!fromEditor(e)) return null;
+  const file = req?.kind === 'app' ? app.winlandLaunch?.pathOf('apps', String(req.name || '')) : String(req?.path || '');
+  if (!file || !path.isAbsolute(file) || !fs.existsSync(file)) return { ok: false };
+  const image = await app.winlandAppIcon?.(file).catch(() => '') || ''; return { ok: Boolean(image), image };
+});
 ipcMain.handle('deck:pick', async (e, req) => { // a file or a folder for "Open"
   if (!fromEditor(e)) return null;
   const r = await dialog.showOpenDialog(win, { properties: [req?.folder ? 'openDirectory' : 'openFile'] });

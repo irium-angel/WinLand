@@ -551,6 +551,45 @@ namespace WinLand {
     }
   }
 
+  // ---------- an app's own logo, big (Stream Deck buttons): the 256 px Windows icon of a program or shortcut ----------
+  static class AppIcon {
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)] struct SHFILEINFO { public IntPtr hIcon; public int iIcon; public uint attr; [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 260)] public string name; [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 80)] public string type; }
+    [DllImport("shell32.dll", CharSet = CharSet.Unicode)] static extern IntPtr SHGetFileInfo(string path, uint attr, ref SHFILEINFO info, uint size, uint flags);
+    [DllImport("shell32.dll")] static extern int SHGetImageList(int list, ref Guid iid, out IntPtr ppv);
+    [DllImport("comctl32.dll")] static extern IntPtr ImageList_GetIcon(IntPtr list, int i, uint flags);
+    [DllImport("user32.dll")] static extern bool DestroyIcon(IntPtr icon);
+    static Bitmap Get(string path, int list) {
+      var info = new SHFILEINFO(); if (SHGetFileInfo(path, 0, ref info, (uint)Marshal.SizeOf(info), 0x4000) == IntPtr.Zero) return null; // the icon's index (no shortcut arrow)
+      var iid = new Guid("46EB5926-582E-4017-9FDF-E8998DAA0950"); IntPtr images; if (SHGetImageList(list, ref iid, out images) != 0) return null;
+      var h = ImageList_GetIcon(images, info.iIcon, 1); if (h == IntPtr.Zero) return null; // transparent
+      try { using (var icon = Icon.FromHandle(h)) return icon.ToBitmap(); } finally { DestroyIcon(h); }
+    }
+    // the part that is not transparent (a small icon sits in a corner of the 256 px one)
+    static Rectangle Used(Bitmap b) {
+      int x0 = b.Width, y0 = b.Height, x1 = -1, y1 = -1;
+      for (int y = 0; y < b.Height; y++) for (int x = 0; x < b.Width; x++) if (b.GetPixel(x, y).A > 16) { if (x < x0) x0 = x; if (y < y0) y0 = y; if (x > x1) x1 = x; if (y > y1) y1 = y; }
+      return x1 < 0 ? Rectangle.Empty : Rectangle.FromLTRB(x0, y0, x1 + 1, y1 + 1);
+    }
+    public static string Png(string path) {
+      Bitmap b = Get(path, 4); // jumbo, 256 px
+      if (b != null) { var used = Used(b); if (used.IsEmpty || used.Width <= 64 && used.Height <= 64) { b.Dispose(); b = null; } }
+      if (b == null) b = Get(path, 2); // extra large, 48 px
+      if (b == null) return "";
+      using (b) {
+        var used = Used(b); if (used.IsEmpty) return "";
+        int side = Math.Max(used.Width, used.Height);
+        using (var outB = new Bitmap(128, 128, PixelFormat.Format32bppArgb)) {
+          using (var g = Graphics.FromImage(outB)) {
+            g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic; g.PixelOffsetMode = System.Drawing.Drawing2D.PixelOffsetMode.HighQuality;
+            float k = 128f / side; float w = used.Width * k, hh = used.Height * k;
+            g.DrawImage(b, new RectangleF((128 - w) / 2, (128 - hh) / 2, w, hh), used, GraphicsUnit.Pixel);
+          }
+          using (var ms = new MemoryStream()) { outB.Save(ms, ImageFormat.Png); return Convert.ToBase64String(ms.ToArray()); }
+        }
+      }
+    }
+  }
+
   static class Notify {
     public static void Run() {
       var thread = new Thread(() => {
@@ -593,6 +632,7 @@ namespace WinLand {
             else if (parts.Length == 2 && parts[0] == "micmute") { Audio.MicMute(parts[1] == "1"); Program.Say("micmute " + Audio.MicMuted()); }
             else if (parts[0] == "pixel") Program.Say("pixel " + Tools.Pixel());
             else if (parts.Length == 2 && parts[0] == "keys") Keys.Press(parts[1]); // Stream Deck
+            else if (parts.Length == 2 && parts[0] == "appicon") { string r; try { r = AppIcon.Png(Encoding.UTF8.GetString(Convert.FromBase64String(parts[1]))); } catch { r = ""; } Program.Say("appicon " + (r == "" ? "-" : r)); }
             else if (parts.Length == 2 && parts[0] == "type") Keys.Type(Encoding.UTF8.GetString(Convert.FromBase64String(parts[1])));
             else if (parts.Length == 2 && parts[0] == "rect") Program.Say("rect " + Tools.FrontRect(int.Parse(parts[1])));
             else if (parts[0] == "agenda") { string a; try { a = Tools.Agenda(); } catch { a = "[]"; } Program.Say("agenda " + a); }
