@@ -120,6 +120,7 @@
     onRemoteChanged: callback => subscribe('remote:changed', callback),
     deckEditor: lang => ipcRenderer.send('deck:open-editor', lang === 'en' ? 'en' : 'fr'), // the Stream Deck editor (deck-main.cjs)
     remoteState: state => ipcRenderer.send('remote:state', state),
+    remoteCover: url => ipcRenderer.send('remote:cover', String(url || '')), // the album cover for the phone's player
     onRemoteDo: callback => subscribe('remote:do', callback),
     pipDesk: on => ipcRenderer.invoke('pip:desk', Boolean(on)), // Pip on the desktop (companion-main.cjs)
     onPipHome: callback => subscribe('pip:home', callback),

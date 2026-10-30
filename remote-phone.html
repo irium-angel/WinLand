@@ -50,6 +50,37 @@
   .chips{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
   .chip{height:60px;border:0;border-radius:13px;background:var(--card2);color:var(--dim);font:600 12px inherit;font-family:inherit;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px}
   .chip.on{background:rgba(79,140,255,.18);color:#8db4ff}
+  /* the music player, the same as the island's: the cover's colour rising from the bottom, white type and symbols */
+  .slot{display:contents}
+  .player{--c:#1ed760;border-radius:22px;padding:16px;background:#000;position:relative;overflow:hidden;transition:background .6s}
+  .pl-top{display:flex;align-items:center;gap:13px}
+  .cover{width:72px;height:72px;border-radius:12px;background:#1c1c1e;flex:none;display:grid;place-items:center;color:#8e8e93;overflow:hidden;box-shadow:0 6px 16px rgba(0,0,0,.45)}
+  .cover img{width:100%;height:100%;object-fit:cover;display:block}
+  .pl-tx{flex:1;min-width:0}
+  .pl-title{font-size:17px;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .pl-artist{font-size:14px;color:rgba(255,255,255,.55);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .viz{display:flex;align-items:center;gap:3px;height:30px;flex:none;align-self:flex-start;margin-top:4px}
+  .viz i{width:4.5px;height:16%;border-radius:3px;background:var(--c);box-shadow:0 0 9px var(--c);transition:height .3s}
+  .player.playing .viz i{animation:viz .8s ease-in-out infinite alternate}
+  .player.playing .viz i:nth-child(2){animation-duration:.62s;animation-delay:-.3s}.player.playing .viz i:nth-child(3){animation-duration:.95s;animation-delay:-.5s}
+  .player.playing .viz i:nth-child(4){animation-duration:.7s;animation-delay:-.1s}.player.playing .viz i:nth-child(5){animation-duration:.86s;animation-delay:-.65s}.player.playing .viz i:nth-child(6){animation-duration:.58s;animation-delay:-.2s}
+  @keyframes viz{0%{height:18%}40%{height:92%}70%{height:46%}100%{height:74%}}
+  .pl-time{display:flex;align-items:center;gap:10px;margin-top:16px;font-size:11.5px;font-weight:500;color:rgba(255,255,255,.55);font-variant-numeric:tabular-nums}
+  .pl-time span{min-width:34px}.pl-time span:last-child{text-align:right}
+  .pl-bar{flex:1;height:22px;display:flex;align-items:center;cursor:pointer;touch-action:none}
+  .pl-line{position:relative;width:100%;height:4px;border-radius:2px;background:rgba(255,255,255,.2);transition:height .15s}
+  .pl-line b{position:absolute;left:0;top:0;bottom:0;border-radius:2px;background:#fff;width:0}
+  .pl-bar.grab .pl-line{height:7px}
+  .pl-bar.grab .pl-line b::after{content:"";position:absolute;right:-7px;top:50%;width:14px;height:14px;margin-top:-7px;border-radius:50%;background:#fff;box-shadow:0 1px 6px rgba(0,0,0,.5)}
+  .pl-ctl{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;margin-top:8px}
+  .pl-buttons{display:flex;align-items:center;gap:22px;grid-column:2}
+  .pl-buttons button{border:0;background:none;color:#fff;display:grid;place-items:center;padding:6px;border-radius:12px}
+  .pl-buttons button:active{opacity:.55;transform:scale(.92)}
+  .pl-buttons svg{fill:#fff}
+  .pl-src{grid-column:3;justify-self:end;display:flex;align-items:center;gap:6px;height:26px;padding:0 10px;border-radius:8px;background:rgba(255,255,255,.1);font-size:12px;font-weight:600;max-width:100%;min-width:0}
+  .pl-src span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .pl-src:empty{display:none}
+  @media (max-width:430px){.pl-ctl{grid-template-columns:1fr}.pl-buttons{grid-column:1;justify-self:center}.pl-src{grid-column:1;justify-self:center;margin-top:6px}} /* narrow: the app under the buttons */
   /* Stream Deck */
   .pages{display:flex;gap:6px;overflow-x:auto;flex:none;margin-bottom:10px;scrollbar-width:none;justify-content:safe center}
   .pages::-webkit-scrollbar{display:none}
@@ -226,7 +257,7 @@ function show(next) {
   $('seg').innerHTML = `<button data-view="deck" class="${view === 'deck' ? 'on' : ''}">${I('grid', 16)}Stream Deck</button><button data-view="remote" class="${view === 'remote' ? 'on' : ''}">${I('remote', 16)}${T('Télécommande', 'Remote')}</button>`;
   $('more').innerHTML = `<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>`;
   clearInterval(timer); $('view').innerHTML = '';
-  if (view === 'remote') { $('view').innerHTML = `<div class="scroll"><div class="cards" id="cards"></div></div>`; loadState(); timer = setInterval(loadState, 2000); }
+  if (view === 'remote') { $('view').innerHTML = `<div class="scroll"><div class="cards" id="cards"></div></div>`; coverShown = null; loadState(); timer = setInterval(loadState, 1500); }
   else { buildDeckView(); loadDeck(); timer = setInterval(() => { if (!document.hidden) loadDeck(true); }, 4000); }
 }
 function menu(open) {
@@ -243,19 +274,78 @@ const lost = e => { if (e.message === 'pair') pairScreen(T('Ce téléphone a ét
 
 // ---------- remote ----------
 async function loadState() { try { const s = await call('/api/state'); if (view === 'remote') drawRemote(s); status(T('Connecté à ton PC', 'Connected to your PC'), 'on'); } catch (e) { lost(e); } }
+// filled symbols, like the island's player
+const MEDIA = {
+  play: '<svg viewBox="0 0 24 24" width="34" height="34"><path d="M7 4.6v14.8a1 1 0 0 0 1.5.86l12.3-7.4a1 1 0 0 0 0-1.72L8.5 3.74A1 1 0 0 0 7 4.6z"/></svg>',
+  pause: '<svg viewBox="0 0 24 24" width="34" height="34"><rect x="5.5" y="4" width="4.6" height="16" rx="1.4"/><rect x="13.9" y="4" width="4.6" height="16" rx="1.4"/></svg>',
+  next: '<svg viewBox="0 0 24 24" width="24" height="24"><path d="M3 6.2v11.6l8-5.8zM11 6.2v11.6l8-5.8z"/><rect x="19.2" y="6" width="2.2" height="12" rx="1.1"/></svg>',
+  previous: '<svg viewBox="0 0 24 24" width="24" height="24"><path d="M21 6.2v11.6l-8-5.8zM13 6.2v11.6L5 12z"/><rect x="2.6" y="6" width="2.2" height="12" rx="1.1"/></svg>'
+};
+const LAPTOP = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="4" y="5" width="16" height="11" rx="2"/><path d="M2 19.5h20"/></svg>';
+const rgba = (c, a) => { const m = /rgba?\((\d+),\s*(\d+),\s*(\d+)/.exec(c || ''); if (m) return `rgba(${m[1]},${m[2]},${m[3]},${a})`; const n = parseInt(String(c || '#1ed760').replace('#', '').slice(0, 6), 16); return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${a})`; };
+const clock = ms => { const s = Math.max(0, Math.floor(ms / 1000)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
+let music = null, musicAt = 0, coverShown = null, coverUrl = '', grabbing = null;
+function playerHtml() {
+  return `<div class="player" id="player"><div class="pl-top"><div class="cover" id="plCover">${I('music', 26)}</div><div class="pl-tx"><div class="pl-title" id="plTitle"></div><div class="pl-artist" id="plArtist"></div></div><div class="viz">${'<i></i>'.repeat(6)}</div></div>
+    <div class="pl-time"><span id="plAt">0:00</span><div class="pl-bar" id="plBar"><div class="pl-line"><b id="plFill"></b></div></div><span id="plLeft">-0:00</span></div>
+    <div class="pl-ctl"><div class="pl-buttons"><button data-a="previous" aria-label="${T('Précédent', 'Previous')}">${MEDIA.previous}</button><button data-a="play" id="plPlay" aria-label="${T('Lecture', 'Play')}">${MEDIA.play}</button><button data-a="next" aria-label="${T('Suivant', 'Next')}">${MEDIA.next}</button></div><div class="pl-src" id="plSrc"></div></div></div>`;
+}
 function drawRemote(s) {
   const c = s.claude || {}, m = s.music || {}, f = s.focus || {}, box = $('cards'); if (!box) return;
   $('logo').style.setProperty('--e', COLOURS[c.state] || '#1c1c1e');
-  const ask = c.permission ? `<div class="card"><div class="cap">${I('bell', 14)}${T('Claude demande', 'Claude asks')}</div><div class="title">${esc(c.permission)}</div>${c.permissionDetail ? `<div class="line">${esc(c.permissionDetail)}</div>` : ''}
+  if (!$('player')) { box.innerHTML = `<div class="slot" id="askSlot"></div><div class="card" id="claudeCard"></div>${playerHtml()}<div class="card" id="focusCard"></div><div class="card" id="modeCard"></div>`; bindBar(); }
+  $('askSlot').innerHTML = c.permission ? `<div class="card"><div class="cap">${I('bell', 14)}${T('Claude demande', 'Claude asks')}</div><div class="title">${esc(c.permission)}</div>${c.permissionDetail ? `<div class="line">${esc(c.permissionDetail)}</div>` : ''}
       <div class="row"><button class="btn ok" data-a="allow">${I('check', 18)}${T('Autoriser', 'Allow')}</button><button class="btn bad" data-a="deny">${I('x', 18)}${T('Refuser', 'Deny')}</button></div></div>` : '';
+  $('claudeCard').innerHTML = `<div class="cap">${I('claude', 14)}Claude Code</div><div class="title"><span class="lamp" style="background:${COLOURS[c.state] || '#55555f'}"></span>${esc(STATES[c.state] || T('Rien en cours', 'Nothing running'))}</div>${c.project ? `<div class="line">${esc(c.project)}${c.detail ? ' · ' + esc(c.detail) : ''}</div>` : ''}${c.question ? `<div class="line">${esc(c.question)}</div>` : ''}`;
+  $('focusCard').innerHTML = `<div class="row" style="margin-top:0"><button class="btn ${f.active ? 'on' : ''}" data-a="focus">${I('focus', 18)}${f.active ? esc(f.label) : 'Focus'}</button><button class="btn ${s.micMuted ? 'on' : ''}" data-a="mic">${I(s.micMuted ? 'mic-off' : 'mic', 18)}${s.micMuted ? T('Micro coupé', 'Mic off') : T('Micro', 'Mic')}</button></div>`;
   const MODES = [['normal', 'home', 'Normal', 'Normal'], ['meeting', 'users', 'Réunion', 'Meeting'], ['night', 'moon', 'Nuit', 'Night'], ['stream', 'broadcast', 'Stream', 'Stream']];
-  box.innerHTML = `${ask}
-    <div class="card"><div class="cap">${I('claude', 14)}Claude Code</div><div class="title"><span class="lamp" style="background:${COLOURS[c.state] || '#55555f'}"></span>${esc(STATES[c.state] || T('Rien en cours', 'Nothing running'))}</div>${c.project ? `<div class="line">${esc(c.project)}${c.detail ? ' · ' + esc(c.detail) : ''}</div>` : ''}${c.question ? `<div class="line">${esc(c.question)}</div>` : ''}</div>
-    <div class="card"><div class="cap">${I('music', 14)}${T('Musique', 'Music')}</div><div class="title">${esc(m.title || T('Rien ne joue', 'Nothing playing'))}</div>${m.artist ? `<div class="line">${esc(m.artist)}</div>` : ''}
-      <div class="row"><button class="btn" data-a="previous" aria-label="${T('Précédent', 'Previous')}">${I('prev')}</button><button class="btn main" data-a="${m.playing ? 'pause' : 'play'}" aria-label="${m.playing ? 'Pause' : T('Lecture', 'Play')}">${I(m.playing ? 'pause' : 'play')}</button><button class="btn" data-a="next" aria-label="${T('Suivant', 'Next')}">${I('next')}</button></div></div>
-    <div class="card"><div class="row" style="margin-top:0"><button class="btn ${f.active ? 'on' : ''}" data-a="focus">${I('focus', 18)}${f.active ? esc(f.label) : 'Focus'}</button><button class="btn ${s.micMuted ? 'on' : ''}" data-a="mic">${I(s.micMuted ? 'mic-off' : 'mic', 18)}${s.micMuted ? T('Micro coupé', 'Mic off') : T('Micro', 'Mic')}</button></div></div>
-    <div class="card"><div class="cap">${I('layers', 14)}${T('Mode', 'Mode')}</div><div class="chips">${MODES.map(([id, icon, a, b]) => `<button class="chip ${s.mode === id ? 'on' : ''}" data-a="mode" data-v="${id}">${I(icon, 20)}${T(a, b)}</button>`).join('')}</div></div>`;
+  $('modeCard').innerHTML = `<div class="cap">${I('layers', 14)}${T('Mode', 'Mode')}</div><div class="chips">${MODES.map(([id, icon, a, b]) => `<button class="chip ${s.mode === id ? 'on' : ''}" data-a="mode" data-v="${id}">${I(icon, 20)}${T(a, b)}</button>`).join('')}</div>`;
+  updatePlayer(m);
   last = s;
+}
+function updatePlayer(m) {
+  music = m; musicAt = performance.now();
+  const p = $('player'); if (!p) return;
+  const colour = m.colour || '#1ed760';
+  p.style.setProperty('--c', colour); p.classList.toggle('playing', Boolean(m.playing));
+  p.style.background = m.title ? `linear-gradient(180deg,#000 12%,${rgba(colour, .22)} 58%,${rgba(colour, .58)} 100%)` : '#000'; // black at the top, the cover's colour rising
+  $('plTitle').textContent = m.title || T('Rien ne joue', 'Nothing playing');
+  $('plArtist').textContent = m.title ? m.artist || '' : T('Lance de la musique sur ton PC', 'Play some music on your PC');
+  const play = $('plPlay'); play.dataset.a = m.playing ? 'pause' : 'play'; play.innerHTML = m.playing ? MEDIA.pause : MEDIA.play;
+  $('plSrc').innerHTML = m.title ? `${LAPTOP}<span>${esc(m.source || T('Ce PC', 'This PC'))}</span>` : '';
+  if (m.cover !== coverShown) loadCover(m.cover);
+  tickPlayer();
+}
+async function loadCover(id) {
+  coverShown = id; const box = $('plCover');
+  if (!id) { box.innerHTML = I('music', 26); return; }
+  try {
+    const r = await fetch('/api/cover', { headers: { 'X-WinLand-Token': TOKEN }, cache: 'no-store' }); if (!r.ok) throw 0;
+    const url = URL.createObjectURL(await r.blob()); if (coverUrl) URL.revokeObjectURL(coverUrl); coverUrl = url;
+    if (coverShown === id && $('plCover')) $('plCover').innerHTML = `<img src="${url}" alt="">`;
+  } catch { box.innerHTML = I('music', 26); }
+}
+// the time moves on between two updates from the PC, like on the island
+const position = () => !music ? 0 : Math.min(music.duration || 0, (music.progress || 0) + (music.playing ? performance.now() - musicAt : 0));
+function tickPlayer() {
+  if (!$('player') || !music) return;
+  const dur = music.duration || 0, at = grabbing != null ? grabbing : position();
+  $('plFill').style.width = dur ? `${Math.min(100, at / dur * 100)}%` : '0%';
+  $('plAt').textContent = clock(at); $('plLeft').textContent = dur ? '-' + clock(dur - at) : '0:00';
+}
+(function frame() { if (view === 'remote') tickPlayer(); requestAnimationFrame(frame); })();
+// grab the bar and slide: you see where you land, let go to jump there
+function bindBar() {
+  const bar = $('plBar'); if (!bar) return;
+  const msAt = x => { const r = bar.getBoundingClientRect(); return Math.round(Math.min(1, Math.max(0, (x - r.left) / r.width)) * (music?.duration || 0)); };
+  bar.addEventListener('pointerdown', e => { if (!music?.canSeek) return; grabbing = msAt(e.clientX); bar.classList.add('grab'); bar.setPointerCapture?.(e.pointerId); tickPlayer(); });
+  bar.addEventListener('pointermove', e => { if (grabbing != null) { grabbing = msAt(e.clientX); tickPlayer(); } });
+  const done = async e => {
+    if (grabbing == null) return; const ms = msAt(e.clientX); grabbing = null; bar.classList.remove('grab');
+    music.progress = ms; musicAt = performance.now(); tickPlayer(); vibrate(10);
+    try { await call('/api/do', { kind: 'seek', value: String(ms) }); } catch (err) { lost(err); }
+  };
+  bar.addEventListener('pointerup', done); bar.addEventListener('pointercancel', () => { grabbing = null; bar.classList.remove('grab'); });
 }
 
 // ---------- Stream Deck ----------

@@ -20,7 +20,7 @@
 #winland-remote .rm-qr svg{width:100%;height:100%}
 #winland-remote .rm-qr.off{background:#1c1c1e;color:#636366}
 #winland-remote .rm-qr.off svg{width:44px;height:44px}
-#winland-remote .rm-side{flex:1;min-width:0;display:flex;flex-direction:column;gap:7px}
+#winland-remote .rm-side{flex:1;min-width:0;display:flex;flex-direction:column;gap:5px}
 #winland-remote .rm-cap{font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:#8e8e93;font-weight:600}
 #winland-remote .rm-title{font-size:15px;font-weight:700;letter-spacing:-.2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #winland-remote .rm-text{color:#a1a1ab;font-size:12px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
@@ -33,7 +33,9 @@
 #winland-remote button{border:0;border-radius:9px;height:28px;padding:0 10px;background:#2c2c2e;color:#fff;font:600 11.5px Inter,"Segoe UI",sans-serif;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;flex:none;cursor:pointer}
 #winland-remote button:hover{filter:brightness(1.2)}
 #winland-remote button.go{background:#0a84ff}#winland-remote button.deck{background:#3a3a3c}
-#winland-remote .err{color:#ff9f0a}`;
+#winland-remote .err{color:#ff9f0a}
+#winland-remote .rm-line.ok{color:#30d158}#winland-remote .rm-line.warn{color:#ff9f0a}
+#winland-remote .rm-addr{font:600 11.5px ui-monospace,Consolas,monospace;color:#d1d1d6;-webkit-user-select:text;user-select:text}`;
   document.head.appendChild(style);
   let info = null, wanted = store.get('winland:remote', false), poll = null;
   async function refresh() { info = await api.remoteInfo().catch(() => null); render(); }
@@ -43,14 +45,17 @@
     if (currentView !== 'remote') return;
     const on = Boolean(info?.on), phones = info?.devices?.length || 0;
     // only the countdown changes every second: the rest is redrawn when it changes (a click never lands on a vanished button)
-    const key = JSON.stringify([on, info?.code, phones, info?.error, Boolean(info?.lockedFor), info?.url, prefs().lang]), left = root.querySelector('.rm-code small');
+    const seen = info?.visit ? Math.floor((Date.now() - info.visit.at) / 60000) : -1;
+    const key = JSON.stringify([on, info?.code, phones, info?.error, Boolean(info?.lockedFor), info?.url, prefs().lang, info?.visit?.ip, seen]), left = root.querySelector('.rm-code small');
     if (key === drawn && left) { left.textContent = info.lockedFor ? T('trop d’essais, pause', 'too many tries, paused') : T(`change dans ${clock(info.codeLeft)}`, `changes in ${clock(info.codeLeft)}`); return; }
     drawn = key;
     let qr = ''; try { qr = on && info.url ? window.__winlandQR(info.url, 'M') : ''; } catch {}
     const deckBtn = `<button type="button" class="deck" data-deck="1">${I('grid', 14)}Stream Deck</button>`;
     const side = on ? `<div class="rm-cap">${T('Code de connexion', 'Pairing code')}</div>
         <div class="rm-code"><b>${esc((info.code || '').replace(/(\d{3})(\d{3})/, '$1 $2'))}</b><small>${info.lockedFor ? T('trop d’essais, pause', 'too many tries, paused') : T(`change dans ${clock(info.codeLeft)}`, `changes in ${clock(info.codeLeft)}`)}</small></div>
-        <div class="rm-line">${I('phone', 13)}${phones ? T(`${phones} téléphone${phones > 1 ? 's' : ''} connecté${phones > 1 ? 's' : ''}`, `${phones} phone${phones > 1 ? 's' : ''} paired`) : T('Scanne le QR code, puis tape ce code', 'Scan the QR code, then type this code')}</div>
+        <div class="rm-line">${I('phone', 13)}${phones ? T(`${phones} appareil${phones > 1 ? 's' : ''} connecté${phones > 1 ? 's' : ''}`, `${phones} device${phones > 1 ? 's' : ''} paired`) : T('Scanne le QR code, puis tape ce code', 'Scan the QR code, then type this code')}</div>
+        <div class="rm-line" title="${T('Si le QR code ne s’ouvre pas, tape cette adresse dans le navigateur du téléphone', 'If the QR code does not open, type this address in the phone’s browser')}">${I('globe', 13)}<span class="rm-addr">${esc(info.address)}:${info.port}</span></div>
+        ${!phones ? `<div class="rm-line ${info.visit ? 'ok' : 'warn'}" title="${T('Le téléphone doit être sur le Wi-Fi principal de la box (pas le Wi-Fi invité, pas en 4G/5G). Sinon, tape l’adresse ci-dessus dans son navigateur.', 'The phone must be on the box’s main Wi-Fi (not the guest one, not on 4G/5G). Or type the address above in its browser.')}">${info.visit ? I('check', 13) + T(`Page ouverte par ${esc(info.visit.ip)}`, `Page opened by ${esc(info.visit.ip)}`) : I('wifi', 13) + T('Pas encore ouverte : même Wi-Fi que le PC ?', 'Not opened yet: same Wi-Fi as the PC?')}</div>` : ''}
         ${info.error ? `<div class="rm-line err">${esc(info.error)}</div>` : ''}
         <div class="rm-row"><button type="button" data-onoff="1">${I('power', 14)}${T('Éteindre', 'Turn off')}</button>${deckBtn}${phones ? `<button type="button" data-forget="1" title="${T('Il faudra retaper un code sur chaque téléphone', 'Each phone will need a new code')}">${I('x', 14)}${T('Déconnecter', 'Disconnect')}</button>` : ''}</div>`
       : `<div class="rm-title">${T('Ton téléphone comme télécommande', 'Your phone as a remote')}</div>
@@ -69,14 +74,20 @@
   if (wanted) api.remoteSet(true).then(r => { info = r; }).catch(() => {}); // it was on last time
 
   // ---------- what the phone sees ----------
+  let coverSent = null, coverId = ''; // the album cover goes to the phone only when the song changes
   setInterval(() => {
     if (!info?.on) return;
+    const cover = spotifyState?.track?.image_url || '';
+    if (cover !== coverSent) { coverSent = cover; coverId = cover ? `${cover.length}-${cover.slice(-24)}` : ''; api.remoteCover?.(cover); }
+    const dur = spotifyState?.duration_ms || 0, playing = Boolean(spotifyState?.is_playing);
+    const at = Math.min(dur || Infinity, (spotifyState?.progress_ms || 0) + (playing && typeof spotifySyncAt === 'number' ? performance.now() - spotifySyncAt : 0));
     const cc = (window.__winlandMonitorIndicator || []).find(p => p.provider === 'claudecode' && p.connected) || {};
     const perm = cc.permission;
     api.remoteState({
       claude: { state: cc.state || '', detail: tr(cc.detail), project: cc.source?.title || '', question: perm ? '' : String(cc.question || '').slice(0, 300), sessionId: cc.sessionId || '',
         permission: perm?.kind === 'tool' ? tr(perm.tool) : '', permissionDetail: perm?.kind === 'tool' ? String(perm.what || '').slice(0, 200) : '' },
-      music: { title: spotifyState?.track?.name || '', artist: spotifyState?.track?.artist || '', playing: Boolean(spotifyState?.is_playing) },
+      music: { title: spotifyState?.track?.name || '', artist: spotifyState?.track?.artist || '', playing, progress: Math.round(at || 0), duration: dur, canSeek: spotifyState?.can_seek !== false && dur > 0,
+        source: spotifyState?.source || '', colour: window.__winlandAlbumColour || '', cover: coverId }, // the same player as the island's
       focus: { active: Boolean(window.__winlandFocus?.active()), label: window.__winlandFocus?.active() ? window.__winlandFocus.label() : '' },
       micMuted: Boolean(window.__winlandMic?.muted()), mode: window.__winlandModes?.get() || 'normal'
     });
@@ -85,6 +96,7 @@
   api.onRemoteDo?.(a => {
     if (a.kind === 'allow' || a.kind === 'deny') { if (a.sessionId) api.aiMonitorHooksDecide(a.sessionId, a.kind); }
     else if (['play', 'pause', 'next', 'previous'].includes(a.kind)) { api.spotifyControl(a.kind); setTimeout(() => { if (typeof refreshSpotify === 'function') refreshSpotify(); }, 400); }
+    else if (a.kind === 'seek') { const ms = Number(a.value); if (ms >= 0) { api.spotifySeek?.(ms); setTimeout(() => { if (typeof refreshSpotify === 'function') refreshSpotify(); }, 400); } }
     else if (a.kind === 'focus') window.__winlandFocus?.toggle();
     else if (a.kind === 'mic') window.__winlandMic?.toggle();
     else if (a.kind === 'mode') window.__winlandModes?.set(a.value);

@@ -49,7 +49,7 @@ const page = () => fs.readFileSync(path.join(__dirname, 'remote-phone.html'), 'u
 const icons = fs.readFileSync(path.join(__dirname, 'deck-icons.js'), 'utf8');
 const appIcon = fs.readFileSync(path.join(__dirname, 'assets', 'icon-256.png'));
 const MANIFEST = JSON.stringify({ name: 'WinLand', short_name: 'WinLand', start_url: '/', scope: '/', display: 'standalone', background_color: '#0b0b0f', theme_color: '#0b0b0f', icons: [{ src: '/icon.png', sizes: '256x256', type: 'image/png', purpose: 'any' }] });
-let server = null, state = {}, error = '';
+let server = null, state = {}, error = '', visit = null; // visit: the last device that reached the page (is the network letting phones through?)
 const HEAD = { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer' };
 const json = (res, status, body) => { res.writeHead(status, { ...HEAD, 'Content-Type': 'application/json' }); res.end(JSON.stringify(body)); };
 const readBody = req => new Promise(done => {
@@ -63,8 +63,10 @@ function start() {
   newCode();
   server = http.createServer(async (req, res) => {
     const url = String(req.url).split('?')[0];
+    const from = String(req.socket.remoteAddress || '').replace(/^::ffff:/, '');
+    if (from && from !== '127.0.0.1' && from !== '::1') { const first = !visit || visit.ip !== from; visit = { ip: from, at: Date.now() }; if (first) island()?.webContents.send('remote:changed'); }
     if (req.method === 'GET' && (url === '/' || url === '/index.html')) { // the page itself holds no secret
-      res.writeHead(200, { ...HEAD, 'Content-Type': 'text/html; charset=utf-8', 'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self'; img-src data: 'self'; manifest-src 'self'" });
+      res.writeHead(200, { ...HEAD, 'Content-Type': 'text/html; charset=utf-8', 'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self'; img-src data: blob: 'self'; manifest-src 'self'" });
       return res.end(page());
     }
     // "Add to Home Screen": it opens like an app, full screen, with WinLand's icon
@@ -90,13 +92,14 @@ function start() {
     if (!device) { req.resume(); return json(res, 403, { ok: false, error: 'pair' }); }
     if (Date.now() - device.seen > 60000) { device.seen = Date.now(); saveDevices(); }
     if (req.method === 'GET' && url === '/api/state') return json(res, 200, { ok: true, ...state, at: Date.now() });
+    if (req.method === 'GET' && url === '/api/cover') { if (!cover) { res.writeHead(404, HEAD); return res.end(); } res.writeHead(200, { ...HEAD, 'Content-Type': cover.type }); return res.end(cover.data); }
     if (req.method === 'GET' && url === '/api/deck') { // the phone says which version it has: the logos are sent again only after a change
       const d = deck.phoneDeck(), has = new URLSearchParams(String(req.url).split('?')[1] || '').get('rev');
       return json(res, 200, has !== null && Number(has) === d.rev ? { ok: true, same: true } : { ok: true, deck: d });
     }
     if (req.method === 'POST' && url === '/api/do') { // the remote's own buttons
       const action = await readBody(req);
-      const kinds = ['allow', 'deny', 'play', 'pause', 'next', 'previous', 'focus', 'mic', 'mode'];
+      const kinds = ['allow', 'deny', 'play', 'pause', 'next', 'previous', 'seek', 'focus', 'mic', 'mode'];
       if (action && kinds.includes(action.kind)) island()?.webContents.send('remote:do', { kind: action.kind, sessionId: String(action.sessionId || ''), value: String(action.value || '') });
       return json(res, 200, { ok: true });
     }
@@ -111,16 +114,18 @@ function start() {
   server.on('error', e => { error = e.code === 'EADDRINUSE' ? `Port ${PORT} déjà pris` : e.message; server = null; });
   server.listen(PORT, '0.0.0.0', () => { error = ''; });
 }
-function stop() { try { server?.close(); server?.closeAllConnections?.(); } catch {} server = null; code = ''; } // a phone still connected is cut off too
+function stop() { try { server?.close(); server?.closeAllConnections?.(); } catch {} server = null; code = ''; visit = null; } // a phone still connected is cut off too
 const info = () => {
   const on = Boolean(server), address = lanAddress(), now = Date.now();
   if (on) freshCode();
   return { ok: true, on, error, address, url: on && address ? `http://${address}:${PORT}/` : '', code: on ? code : '', codeLeft: on ? Math.max(0, CODE_LIFE - (now - codeAt)) : 0,
-    lockedFor: Math.max(0, lockedUntil - now), devices: devices.map(d => ({ id: d.id, name: d.name, seen: d.seen })) };
+    lockedFor: Math.max(0, lockedUntil - now), port: PORT, visit, devices: devices.map(d => ({ id: d.id, name: d.name, seen: d.seen })) };
 };
 ipcMain.handle('remote:set', (e, req) => { if (!fromIsland(e)) return null; if (req?.on) start(); else stop(); return new Promise(r => setTimeout(() => r(info()), 300)); });
 ipcMain.handle('remote:info', e => fromIsland(e) ? info() : null);
 ipcMain.handle('remote:new-code', e => { if (!fromIsland(e)) return null; if (server) newCode(); return info(); });
 ipcMain.handle('remote:forget', (e, id) => { if (!fromIsland(e)) return null; devices = id ? devices.filter(d => d.id !== id) : []; saveDevices(); return info(); }); // every phone has to pair again
 ipcMain.on('remote:state', (e, s) => { if (fromIsland(e) && s && typeof s === 'object') state = s; });
+let cover = null; // the album cover of the song playing, for the phone's player
+ipcMain.on('remote:cover', (e, url) => { if (!fromIsland(e)) return; const m = /^data:(image\/(?:png|jpe?g|webp|bmp|gif));base64,([A-Za-z0-9+/=]+)$/.exec(String(url || '')); cover = m && m[2].length < 4000000 ? { type: m[1], data: Buffer.from(m[2], 'base64') } : null; });
 app.on('before-quit', stop);
