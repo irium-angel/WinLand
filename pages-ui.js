@@ -88,6 +88,8 @@
   // Shared look for the DOM pages' title and subtitle.
   const style = document.createElement('style');
   style.textContent = `
+/* one motion vocabulary for every page (Apple: critically damped springs by default, a little bounce only after a flick; strong ease-out for what enters) */
+:root{--wl-ease-out:cubic-bezier(.23,1,.32,1);--wl-ease-in-out:cubic-bezier(.77,0,.175,1);--wl-ease-drawer:cubic-bezier(.32,.72,0,1);--wl-spring:linear(0,0.005 1.1%,0.029 2.8%,0.074 4.9%,0.139 7.2%,0.22 9.8%,0.309 12.5%,0.402 15.4%,0.491 18.4%,0.575 21.6%,0.652 24.9%,0.718 28.3%,0.776 31.9%,0.825 35.5%,0.864 39.2%,0.895 43.1%,0.921 47%,0.941 51%,0.956 55.1%,0.968 59.2%,0.976 63.5%,0.983 67.8%,0.988 72.2%,0.991 76.7%,0.994 81.2%,0.996 85.8%,0.997 90.5%,0.998 95.2%,1);--wl-spring-bounce:linear(0,0.005 1.1%,0.029 2.8%,0.076 4.9%,0.146 7.2%,0.233 9.8%,0.336 12.5%,0.441 15.4%,0.546 18.4%,0.643 21.6%,0.732 24.9%,0.808 28.3%,0.869 31.9%,0.919 35.5%,0.955 39.2%,0.981 43.1%,0.998 47%,1.008 51%,1.013 55.1%,1.015 59.2%,1.014 63.5%,1.012 67.8%,1.01 72.2%,1.007 76.7%,1.005 81.2%,1.004 85.8%,1.002 90.5%,1.001 95.2%,1)}
 .tc-page-title{font:700 18px/24px Inter, "Segoe UI", sans-serif;color:#fff;margin:6px 0 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .tc-page-sub{font:400 11px/16px Inter, "Segoe UI", sans-serif;color:#9aa596;margin:2px 0 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .tc-page-head{display:flex;align-items:flex-start;gap:10px;height:${PAGE.bodyY - 6}px;flex:none}
@@ -95,11 +97,11 @@
 /* Same Windows 11 font in every panel */
 #winland-ai-monitor,#winland-ai-monitor *,#winland-settings-v2,#winland-settings-v2 *,#winland-extras,#winland-extras *,#winland-focus,#winland-focus *,#winland-tools,#winland-tools *:not(.tl-clip){font-family:Inter, "Segoe UI",sans-serif !important}
 .tc-page-title{font-family:Inter, "Segoe UI",sans-serif !important;letter-spacing:-.2px}
-.tc-enter{animation:tc-enter .34s cubic-bezier(.2,.8,.2,1);transform-origin:50% 0}
+.tc-enter{animation:tc-enter .34s var(--wl-ease-out);transform-origin:50% 0}
 @keyframes tc-enter{from{opacity:0;transform:scale(.95);filter:blur(8px)}to{opacity:1;transform:none;filter:none}}
-.tc-slide{animation:tc-slide .28s cubic-bezier(.2,.8,.2,1)}
+.tc-slide{animation:tc-slide .24s var(--wl-ease-out)}
 @keyframes tc-slide{from{opacity:.15;transform:translateX(var(--tc-dx,0px))}to{opacity:1;transform:none}}
-@media(prefers-reduced-motion:reduce){.tc-enter{animation:tc-fade .2s ease-out}@keyframes tc-fade{from{opacity:0}}}
+@media(prefers-reduced-motion:reduce){.tc-enter,.tc-slide{animation:tc-fade .2s ease-out}@keyframes tc-fade{from{opacity:0}}}
 /* Calmer, more refined settings rows and buttons */
 #winland-settings-v2 .tc-setting-row{background:#0f120f;border:1px solid rgba(255,255,255,.06);border-radius:14px;transition:border-color .15s,background .15s}
 #winland-settings-v2 .tc-setting-row:hover{border-color:rgba(255,255,255,.12);background:#121612}
@@ -109,7 +111,7 @@
 #winland-settings-v2 .tc-toggle:active,#winland-settings-v2 .tc-chip:active{transform:scale(.96)}
 #winland-settings-v2 .tc-settings-content{scroll-behavior:smooth}
 /* Buttons in panels */
-#winland-ai-monitor button,#winland-extras button,#winland-focus button{transition:background .15s,border-color .15s,transform .1s}
-#winland-ai-monitor button:active,#winland-extras button:active,#winland-focus button:active{transform:scale(.96)}`;
+#winland-ai-monitor button,#winland-extras button,#winland-focus button,#winland-dashboard button,#winland-rules button,#winland-remote button,#winland-system button,#winland-dev button{transition:background .15s,border-color .15s,transform .16s var(--wl-ease-out)}
+#winland-ai-monitor button:active,#winland-extras button:active,#winland-focus button:active,#winland-dashboard button:not(:disabled):active,#winland-rules button:not(:disabled):active,#winland-remote button:not(:disabled):active,#winland-system button:not(:disabled):active,#winland-dev button:not(:disabled):active{transform:scale(.96);transition-duration:.08s}`;
   document.head.appendChild(style);
 })();

@@ -936,14 +936,16 @@
     #winland-settings-v2 .tc-setting-row small{font-size:10px !important;color:#8f998d !important;margin-top:3px !important}
     /* real switches */
     #winland-settings-v2 .tc-toggle[data-toggle],#winland-settings-v2 .tc-toggle[data-action="sleep"]{position:relative;flex:none;width:46px;height:28px;padding:0 !important;border-radius:14px !important;font-size:0 !important;color:transparent !important;background:#3a3f3a !important;border:0 !important;transition:background .2s}
-    #winland-settings-v2 .tc-toggle[data-toggle]::after,#winland-settings-v2 .tc-toggle[data-action="sleep"]::after{content:"";position:absolute;left:3px;top:3px;width:22px;height:22px;border-radius:50%;background:#fff;box-shadow:0 2px 6px rgba(0,0,0,.35);transition:transform .25s cubic-bezier(.3,1.5,.5,1)}
+    #winland-settings-v2 .tc-toggle[data-toggle]::after,#winland-settings-v2 .tc-toggle[data-action="sleep"]::after{content:"";position:absolute;left:3px;top:3px;width:22px;height:22px;border-radius:50%;background:#fff;box-shadow:0 2px 6px rgba(0,0,0,.35);transition:transform .45s var(--wl-spring),width .2s var(--wl-ease-out)}
+    /* like iOS: the knob stretches under the finger, and slides on a spring that does not overshoot */
+    #winland-settings-v2 .tc-toggle[data-toggle]:active::after,#winland-settings-v2 .tc-toggle[data-action="sleep"]:active::after{width:28px}
+    #winland-settings-v2 .tc-toggle[data-toggle].on:active::after,#winland-settings-v2 .tc-toggle[data-action="sleep"].on:active::after{transform:translateX(12px)}
     #winland-settings-v2 .tc-toggle[data-toggle].on,#winland-settings-v2 .tc-toggle[data-action="sleep"].on{background:#8fd65a !important}
     #winland-settings-v2 .tc-toggle[data-toggle].on::after,#winland-settings-v2 .tc-toggle[data-action="sleep"].on::after{transform:translateX(18px)}
     /* choice chips */
     #winland-settings-v2 .tc-chip{border-radius:999px !important;background:#1d211d !important;border:1px solid rgba(255,255,255,.08) !important;color:#dfe5db !important;transition:transform .12s,background .15s}
     #winland-settings-v2 .tc-chip:hover{background:#262b25 !important}
-    #winland-settings-v2 .tc-chip.on{background:#c6e994 !important;color:#10180c !important;border-color:transparent !important;animation:tcPop .3s cubic-bezier(.3,1.6,.5,1)}
-    @keyframes tcPop{0%{transform:scale(.85)}100%{transform:scale(1)}}
+    #winland-settings-v2 .tc-chip.on{background:#c6e994 !important;color:#10180c !important;border-color:transparent !important}
     /* tabs */
     #winland-settings-v2 .tc-tabs{padding:4px !important;border-radius:14px !important}
     #winland-settings-v2 .tc-tabs button{padding:7px 16px !important;border-radius:10px !important;font-size:11.5px !important}

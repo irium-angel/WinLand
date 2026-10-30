@@ -49,10 +49,10 @@
 #winland-chat .cr-input{position:absolute;left:12px;right:12px;bottom:10px;height:46px;display:flex;align-items:center;border-radius:23px;background:rgba(255,255,255,.09);box-shadow:inset 0 0 0 1px rgba(255,255,255,.07)}
 #winland-chat .cr-input:focus-within{box-shadow:inset 0 0 0 1px rgba(255,255,255,.24)}
 #winland-chat .cr-input input{flex:1;min-width:0;height:100%;border:0;background:transparent;color:#fff;font:14px Inter, "Segoe UI",sans-serif;padding:0 12px;outline:none;user-select:text;caret-color:#fff;caret-animation:manual}
-#winland-chat .cr-in.cr-me{animation:crme .32s cubic-bezier(.2,1.3,.4,1) both}#winland-chat .cr-in.cr-ai{animation:crai .45s cubic-bezier(.2,.9,.3,1) both}
+#winland-chat .cr-in.cr-me{animation:crme .5s var(--wl-spring-bounce) both}#winland-chat .cr-in.cr-ai{animation:crai .45s var(--wl-ease-out) both}
 @keyframes crme{from{opacity:0;transform:translate(14px,6px) scale(.92)}to{opacity:1;transform:none}}@keyframes crai{from{opacity:0;transform:translateY(8px);filter:blur(3px)}to{opacity:1;transform:none;filter:none}}
-#winland-chat .cr-done{display:inline-flex;align-items:center;gap:6px;margin-bottom:6px;padding:3px 10px 3px 8px;border-radius:999px;background:rgba(126,230,162,.14);color:#8ff0b0;font-size:11.5px;font-weight:700;animation:crpop .5s cubic-bezier(.3,1.6,.5,1) both}
-@keyframes crpop{0%{opacity:0;transform:scale(.6)}100%{opacity:1;transform:none}}
+#winland-chat .cr-done{display:inline-flex;align-items:center;gap:6px;margin-bottom:6px;padding:3px 10px 3px 8px;border-radius:999px;background:rgba(126,230,162,.14);color:#8ff0b0;font-size:11.5px;font-weight:700;animation:crpop .35s var(--wl-ease-out) both}
+@keyframes crpop{0%{opacity:0;transform:scale(.9)}100%{opacity:1;transform:none}}
 #winland-chat .cr-diff{margin:8px 0 2px;border-radius:10px;overflow:hidden;box-shadow:inset 0 0 0 1px rgba(255,255,255,.08);background:rgba(0,0,0,.28)}
 #winland-chat .cr-file{padding:5px 10px;font-size:11px;font-weight:600;color:#c9c9d6;background:rgba(255,255,255,.05)}
 #winland-chat .cr-diff pre{margin:0;padding:4px 10px;font:11.5px/1.5 "Cascadia Code",Consolas,monospace;white-space:pre-wrap;user-select:text}

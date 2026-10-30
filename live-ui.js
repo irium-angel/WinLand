@@ -49,8 +49,8 @@
   const style = document.createElement('style'); style.textContent = `
 #winland-card{position:absolute;z-index:80;left:-999px;top:0;width:380px;display:none;gap:12px;align-items:center;padding:12px 16px;border-radius:22px;background:#000;color:#fff;
   box-shadow:0 16px 40px rgba(0,0,0,.45),0 0 0 1px rgba(255,255,255,.08);font:13px/1.35 Inter,"Segoe UI",sans-serif;pointer-events:none;
-  transform-origin:50% 0;transition:opacity .25s,transform .35s cubic-bezier(.3,1.3,.5,1)}
-#winland-card.in{opacity:1;transform:none}#winland-card:not(.in){opacity:0;transform:scale(.85) translateY(-10px)}
+  transform-origin:50% 0;transition:opacity .25s var(--wl-ease-out),transform .55s var(--wl-spring-bounce)}
+#winland-card.in{opacity:1;transform:none}#winland-card:not(.in){opacity:0;transform:scale(.92) translateY(-10px);transition-duration:.18s;transition-timing-function:ease-in-out} /* it leaves the way it came, faster */
 #winland-card .ic{width:36px;height:36px;border-radius:11px;display:grid;place-items:center;flex:none;font-weight:800;font-size:16px;background:var(--c,#2c2c2e)}
 #winland-card .tx{min-width:0;flex:1}
 #winland-card small{display:block;color:#a1a1ab;font-size:11px;font-weight:650;letter-spacing:.02em;text-transform:uppercase}
