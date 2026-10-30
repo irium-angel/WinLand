@@ -21,8 +21,9 @@ function walk(dir, depth, out, test) {
   }
 }
 let index = null, indexedAt = 0;
-function build() {
-  if (index && Date.now() - indexedAt < 60000) return index;
+// Only palette:index refreshes the list: the ids the palette shows are positions in it, so opening uses the same list.
+function build(fresh) {
+  if (index && (!fresh || Date.now() - indexedAt < 60000)) return index;
   const lnk = n => /\.lnk$/i.test(n) && !/uninstall|désinstall|readme|help|website/i.test(n);
   const starts = [];
   for (const root of [path.join(process.env.ProgramData || 'C:\\ProgramData', 'Microsoft', 'Windows', 'Start Menu', 'Programs'), path.join(app.getPath('appData'), 'Microsoft', 'Windows', 'Start Menu', 'Programs')]) walk(root, 3, starts, lnk);
@@ -46,7 +47,7 @@ function build() {
 }
 ipcMain.handle('palette:index', e => {
   if (!fromIsland(e)) return null;
-  const i = build(), strip = list => list.map((x, n) => ({ id: n, name: x.name }));
+  const i = build(true), strip = list => list.map((x, n) => ({ id: n, name: x.name }));
   return { ok: true, apps: strip(i.apps), recent: strip(i.recent), projects: strip(i.projects), scripts: strip(i.scripts) };
 });
 ipcMain.handle('palette:open', async (e, req) => {
@@ -69,13 +70,26 @@ ipcMain.handle('palette:open', async (e, req) => {
 ipcMain.handle('palette:scripts-folder', async e => { if (!fromIsland(e)) return null; build(); await shell.openPath(scriptsDir()); return { ok: true }; });
 
 // ---------- a task for Claude Code, in a terminal, in the project's folder ----------
+let claudePath; // where your Claude Code is
+function claudeExe() {
+  if (claudePath !== undefined) return Promise.resolve(claudePath);
+  const known = [path.join(app.getPath('home'), '.local', 'bin', 'claude.exe'), path.join(app.getPath('appData'), 'npm', 'claude.cmd')].find(p => fs.existsSync(p));
+  if (known) return Promise.resolve(claudePath = known);
+  return run('where.exe', ['claude']).then(out => (claudePath = out.split(/\r?\n/).map(l => l.trim()).find(l => /\.(exe|cmd)$/i.test(l)) || ''));
+}
 ipcMain.handle('palette:claude', async (e, req) => {
   if (!fromIsland(e)) return null;
   const prompt = String(req?.prompt || '').trim().slice(0, 2000); if (!prompt) return { ok: false };
   const projects = build().projects, dir = projects[Number(req?.project)]?.path || projects[0]?.path || app.getPath('home');
   const wt = path.join(process.env.LOCALAPPDATA || '', 'Microsoft', 'WindowsApps', 'wt.exe');
-  if (fs.existsSync(wt)) spawn(wt, ['-d', dir, 'cmd', '/k', 'claude', prompt.replace(/;/g, '\\;')], { detached: true, stdio: 'ignore' }).unref(); // ";" separates Windows Terminal commands
-  else spawn('cmd.exe', ['/c', 'start', '""', '/D', dir, 'cmd', '/k', 'claude', prompt], { detached: true, stdio: 'ignore', windowsHide: true }).unref();
+  const exe = await claudeExe(); if (!exe) return { ok: false, error: 'claude' };
+  if (/\.exe$/i.test(exe)) { // claude.exe gets the sentence as one argument, untouched (no cmd.exe reading & | > " in it)
+    if (fs.existsSync(wt)) spawn(wt, ['-d', dir, exe, prompt.replace(/;/g, '\\;')], { detached: true, stdio: 'ignore' }).unref(); // ";" separates Windows Terminal commands
+    else spawn(exe, [prompt], { cwd: dir, detached: true, stdio: 'ignore' }).unref(); // in its own console window
+  } else { // claude.cmd (npm) goes through cmd.exe: the sentence in quotes, where & | < > ^ are plain text
+    const quoted = '"' + prompt.replace(/["\r\n]+/g, ' ').replace(/%/g, '% ') + '"';
+    spawn('cmd.exe', ['/d', '/c', 'start', '""', '/D', `"${dir}"`, 'cmd', '/k', `"${exe}"`, quoted], { detached: true, stdio: 'ignore', windowsVerbatimArguments: true }).unref();
+  }
   return { ok: true, project: path.basename(dir) };
 });
 

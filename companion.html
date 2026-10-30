@@ -74,6 +74,8 @@ function draw(t) {
   const over = world.mouse.x > x - 4 && world.mouse.x < x + W + 4 && world.mouse.y > y - 6 && world.mouse.y < base + 4;
   if (over !== pip.over) { pip.over = over; window.pipBridge.hover(over); }
 }
+// the mouse right away (clicks pass through, but moves still arrive), not only every 400 ms from WinLand: a quick click on Pip is his
+addEventListener('mousemove', e => { world.mouse = { x: e.clientX, y: e.clientY }; });
 addEventListener('mousedown', () => { if (pip.over) window.pipBridge.home(); });
 requestAnimationFrame(tick);
 </script>

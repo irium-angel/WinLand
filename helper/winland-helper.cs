@@ -445,6 +445,7 @@ namespace WinLand {
     [DllImport("user32.dll")] static extern IntPtr GetDC(IntPtr h);
     [DllImport("user32.dll")] static extern int ReleaseDC(IntPtr h, IntPtr dc);
     [DllImport("gdi32.dll")] static extern uint GetPixel(IntPtr dc, int x, int y);
+    [DllImport("user32.dll")] static extern IntPtr SetThreadDpiAwarenessContext(IntPtr v);
     [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
     [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr h, out uint pid);
     struct POINT { public int X, Y; }
@@ -490,7 +491,10 @@ namespace WinLand {
     }
     // the colour under the mouse, as #rrggbb
     public static string Pixel() {
+      // real screen pixels on this thread only (on a 125 % or 150 % screen the mouse position would be scaled, the colour wrong)
+      IntPtr was = IntPtr.Zero; try { was = SetThreadDpiAwarenessContext(new IntPtr(-4)); } catch { }
       POINT p; GetCursorPos(out p); var dc = GetDC(IntPtr.Zero); uint c = GetPixel(dc, p.X, p.Y); ReleaseDC(IntPtr.Zero, dc);
+      if (was != IntPtr.Zero) try { SetThreadDpiAwarenessContext(was); } catch { }
       return string.Format("#{0:x2}{1:x2}{2:x2} {3} {4}", c & 0xff, (c >> 8) & 0xff, (c >> 16) & 0xff, p.X, p.Y);
     }
     // the program in front (its file name), for the screen time

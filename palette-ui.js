@@ -22,7 +22,7 @@
 #winland-palette .pl-box svg{width:18px;height:18px;flex:none;stroke:#8e8e93;fill:none;stroke-width:2.2;stroke-linecap:round}
 #winland-palette input{flex:1;min-width:0;border:0;outline:0;background:none;color:#fff;font:500 17px Inter,"Segoe UI",sans-serif}
 #winland-palette input::placeholder{color:#636366}
-#winland-palette .pl-list{margin-top:8px;display:flex;flex-direction:column;gap:2px;max-height:196px;overflow:hidden}
+#winland-palette .pl-list{margin-top:8px;display:flex;flex-direction:column;gap:2px;max-height:calc(100% - 56px);overflow:hidden} /* never over the icons below */
 #winland-palette .pl-row{display:flex;align-items:center;gap:11px;height:38px;padding:0 10px;border-radius:11px;cursor:pointer}
 #winland-palette .pl-row.on{background:#2c2c2e}
 #winland-palette .pl-ic{width:26px;height:26px;border-radius:8px;display:grid;place-items:center;flex:none;font-size:14px;font-weight:800;background:var(--c,#3a3a3c)}
@@ -38,6 +38,7 @@
   // ---------- calculator: + − × ÷ ^ % ( ), decimals with , or . ----------
   function calc(text) {
     const src = text.replace(/×/g, '*').replace(/÷/g, '/').replace(/,/g, '.').replace(/\s+/g, '');
+    if (/^\d{1,4}[-/.]\d{1,2}[-/.]\d{1,4}$/.test(src)) return null; // a date (2024-10-30), not a sum
     if (!/^[\d.+\-*/^%()]+$/.test(src) || !/\d/.test(src) || !/[+\-*/^%]/.test(src.replace(/^-/, ''))) return null;
     let i = 0;
     const num = () => { const m = /^\d*\.?\d+/.exec(src.slice(i)); if (!m) throw 0; i += m[0].length; return parseFloat(m[0]); };
@@ -87,10 +88,11 @@
     const match = name => {
       const s = norm(name); if (!n) return 1; if (s.startsWith(n)) return 100 - s.length / 100;
       const words = s.split(/[\s\-_.]+/).filter(Boolean), initials = words.map(w => w[0]).join('');
-      if (words.some(w => w.startsWith(n))) return 70;
+      const short = s.length / 100; // among equals, the shorter name (Visual Studio Code before "Developer Command Prompt for VS 2019")
+      if (words.some(w => w.startsWith(n))) return 70 - short;
       // several words, or initials: "vs code" → Visual Studio Code
-      if (qWords.length && qWords.every(q => words.some(w => w.startsWith(q)) || (q.length > 1 && initials.includes(q)))) return 60;
-      if (s.includes(n)) return 40; return 0;
+      if (qWords.length && qWords.every(q => words.some(w => w.startsWith(q)) || (q.length > 1 && initials.includes(q)))) return 60 - short + (initials.startsWith(qWords[0]) ? 3 : 0);
+      if (s.includes(n)) return 40 - short; return 0;
     };
     if (q) {
       const pc = /^(-?[\d.,]+)\s*%\s*(?:de|of|d’|d')\s*(-?[\d.,]+)$/i.exec(q); // 15 % de 200
@@ -99,11 +101,13 @@
       const v = convert(q); if (v) add({ icon: '⇄', colour: '#30d158', title: `${fmt(v.value)} ${v.unit}`, sub: q, kind: T('Conversion', 'Conversion'), run: () => copy(fmt(v.value)) }, 1000);
       let m = /^claude[:\s]+(.+)$/i.exec(q);
       if (m) (idx?.projects?.length ? idx.projects.slice(0, 3) : [{ id: -1, name: T('ton dossier', 'your folder') }]).forEach((p, i) =>
-        add({ icon: '✳', colour: '#d97757', title: m[1], sub: `${T('Claude Code dans', 'Claude Code in')} ${p.name}`, kind: 'Claude', run: () => api.paletteClaude(m[1], p.id).then(r => r?.ok && flash(`✳ ${T('Tâche envoyée à Claude', 'Task sent to Claude')} · ${r.project}`, 2400)) }, 900 - i));
-      m = /^(?:minuteur|timer)\s+(\d+(?:[.,]\d+)?)\s*(?:min|m)?\s*(.*)$/i.exec(q);
-      if (m) add({ icon: '⏱', colour: '#ff9f0a', title: `${T('Minuteur', 'Timer')} ${m[1]} min${m[2] ? ' · ' + m[2] : ''}`, kind: T('Minuteur', 'Timer'), run: () => window.__winlandTimers?.add(parseFloat(m[1].replace(',', '.')), m[2], 'timer') }, 950);
-      m = /^(?:rappel|reminder|dans|in)\s+(\d+)\s*(min|m|h|heures?|hours?)?\s*:?\s*(.*)$/i.exec(q);
-      if (m) { const mins = Number(m[1]) * (/^h/i.test(m[2] || '') ? 60 : 1); add({ icon: '🔔', colour: '#ff9f0a', title: m[3] || T('Rappel', 'Reminder'), sub: `${T('dans', 'in')} ${duration(mins)}`, kind: T('Rappel', 'Reminder'), run: () => window.__winlandTimers?.add(mins, m[3], 'reminder') }, 950); }
+        add({ icon: '✳', colour: '#d97757', title: m[1], sub: `${T('Claude Code dans', 'Claude Code in')} ${p.name}`, kind: 'Claude', run: () => api.paletteClaude(m[1], p.id).then(r => flash(r?.ok ? `✳ ${T('Tâche envoyée à Claude', 'Task sent to Claude')} · ${r.project}` : `⚠ ${T('Claude Code est introuvable sur ce PC', 'Claude Code is not on this PC')}`, 2400)) }, 900 - i));
+      // "5", "5 min", "5 minutes", "1 h", "1 heure", "2h30", then what it is for
+      const minutes = m => parseFloat(m[1].replace(',', '.')) * (m[2] ? 60 : 1) + Number(m[3] || 0);
+      m = /^(?:minuteur|timer)\s+(\d+(?:[.,]\d+)?)(?:\s*(?:(heures?|hours?|h)\s*(\d{1,2})?|minutes?|mins?|m)(?![a-zà-ü]))?\s*(.*)$/i.exec(q);
+      if (m) { const mins = minutes(m), label = m[4]; add({ icon: '⏱', colour: '#ff9f0a', title: `${T('Minuteur', 'Timer')} ${duration(mins)}${label ? ' · ' + label : ''}`, kind: T('Minuteur', 'Timer'), run: () => window.__winlandTimers?.add(mins, label, 'timer') }, 950); }
+      m = /^(?:rappel|reminder|dans|in)\s+(\d+(?:[.,]\d+)?)(?:\s*(?:(heures?|hours?|h)\s*(\d{1,2})?|minutes?|mins?|m)(?![a-zà-ü]))?\s*:?\s*(.*)$/i.exec(q);
+      if (m) { const mins = minutes(m); m[3] = m[4]; add({ icon: '🔔', colour: '#ff9f0a', title: m[3] || T('Rappel', 'Reminder'), sub: `${T('dans', 'in')} ${duration(mins)}`, kind: T('Rappel', 'Reminder'), run: () => window.__winlandTimers?.add(mins, m[3], 'reminder') }, 950); }
       m = /^port\s+(\d{2,5})$/i.exec(q);
       if (m) add({ icon: '🔌', colour: '#64d2ff', title: `${T('Port', 'Port')} ${m[1]}`, sub: T('Voir qui l’utilise et le libérer', 'See who uses it and free it'), kind: 'Dev', run: () => freePort(Number(m[1])), keep: true }, 950);
     }
@@ -164,7 +168,7 @@
   list.addEventListener('click', e => { const row = e.target.closest('[data-i]'); if (row) choose(Number(row.dataset.i)); });
 
   async function open() {
-    setView('palette'); setMode('expanded'); api.revealFor?.(30000);
+    setView('palette'); setMode('expanded'); api.revealFor?.(2000);
     input.placeholder = T('Une app, un calcul, claude: …, minuteur 5 min, mode réunion…', 'An app, a sum, claude: …, timer 5 min, mode meeting…');
     input.value = ''; results = search(''); draw();
     setTimeout(() => input.focus(), 60);
@@ -172,7 +176,7 @@
     if (i?.ok) idx = i; clips = c?.clips || []; if (currentView === 'palette') update();
   }
   api.onPaletteShow?.(open);
-  window.__winlandPalette = { open, search: q => search(q).map(r => `${r.kind}: ${r.title}${r.sub ? ' (' + r.sub + ')' : ''}`), calc, convert };
+  window.__winlandCommands = { open, search: q => search(q).map(r => `${r.kind}: ${r.title}${r.sub ? ' (' + r.sub + ')' : ''}`), calc, convert };
 
   let shown = false;
   (function position() {

@@ -18,11 +18,14 @@ const newKey = () => { key = crypto.randomBytes(16).toString('hex'); try { fs.wr
 if (!/^[0-9a-f]{32}$/.test(key)) newKey();
 let server = null, state = {}, error = '';
 
-// this PC's address on the local network (192.168.x.x, 10.x.x.x, 172.16-31.x.x)
+// this PC's address on your Wi-Fi or cable (192.168.x.x first, then 10.x.x.x, 172.16-31.x.x), never the virtual cards
+// of WSL, Hyper-V, VirtualBox, VMware or a VPN, which phones cannot reach
 function lanAddress() {
-  const all = Object.values(os.networkInterfaces()).flat().filter(a => a && a.family === 'IPv4' && !a.internal);
-  const local = a => /^(192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.)/.test(a.address);
-  return (all.find(local) || all[0])?.address || '';
+  const virtual = /vEthernet|WSL|Hyper-V|VirtualBox|VMware|Loopback|Bluetooth|Tailscale|ZeroTier|VPN|TAP|Npcap/i;
+  const all = Object.entries(os.networkInterfaces()).flatMap(([name, list]) => (list || []).map(a => ({ ...a, name })))
+    .filter(a => a.family === 'IPv4' && !a.internal && !/^169\.254\./.test(a.address));
+  const rank = a => (virtual.test(a.name) || /^192.168.56./.test(a.address) ? 10 : 0) + (/^192\.168\./.test(a.address) ? 0 : /^10\./.test(a.address) ? 1 : /^172\.(1[6-9]|2\d|3[01])\./.test(a.address) ? 2 : 5);
+  return all.sort((a, b) => rank(a) - rank(b))[0]?.address || '';
 }
 const page = fs.readFileSync(path.join(__dirname, 'remote-phone.html'), 'utf8');
 const okKey = req => {
@@ -56,7 +59,7 @@ function start() {
   server.on('error', e => { error = e.code === 'EADDRINUSE' ? `Port ${PORT} déjà pris` : e.message; server = null; });
   server.listen(PORT, '0.0.0.0', () => { error = ''; });
 }
-function stop() { try { server?.close(); } catch {} server = null; }
+function stop() { try { server?.close(); server?.closeAllConnections?.(); } catch {} server = null; } // a phone still connected is cut off too
 const info = () => ({ ok: true, on: Boolean(server), error, url: lanAddress() ? `http://${lanAddress()}:${PORT}/#k=${key}` : '', address: lanAddress() });
 ipcMain.handle('remote:set', (e, req) => { if (!fromIsland(e)) return null; if (req?.on) start(); else stop(); return new Promise(r => setTimeout(() => r(info()), 300)); });
 ipcMain.handle('remote:info', e => fromIsland(e) ? info() : null);

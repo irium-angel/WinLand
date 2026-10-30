@@ -11,7 +11,7 @@
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
   const NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
   const FR_NOTES = ['Do', 'Do#', 'Ré', 'Ré#', 'Mi', 'Fa', 'Fa#', 'Sol', 'Sol#', 'La', 'La#', 'Si'];
-  let el = null, loop = null;
+  let el = null, loop = null, current = ''; // the tab on screen
 
   // ---------- tuner ----------
   let mic = null;
@@ -75,6 +75,7 @@
   async function toggleRec(button) {
     if (rec) { rec.stop(); return; }
     let stream; try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); } catch { window.__winlandFlash?.(T('🎙️ Micro inaccessible', '🎙️ Microphone unavailable'), 2000); return; }
+    if (window.__winlandMic?.muted()) window.__winlandFlash?.(T('🔴 Le micro du PC est coupé (Ctrl+Alt+M) : la note sera muette', '🔴 The PC microphone is off (Ctrl+Alt+M): the note will be silent'), 3000);
     chunks = []; rec = new MediaRecorder(stream, { mimeType: 'audio/webm' }); recStart = Date.now();
     rec.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
     rec.onstop = async () => {
@@ -95,14 +96,15 @@
     if (tab === 'memo') return `<div class="st-big"><button type="button" class="st-rec ${rec ? 'on' : ''}" data-rec="1">${rec ? T('Stop', 'Stop') : 'REC'}</button><div><div class="st-memos">${memoList()}</div><div class="st-row" style="margin-top:8px"><button type="button" data-memofolder="1">${T('Ouvrir le dossier', 'Open the folder')}</button></div></div></div>`;
     return '';
   }
-  function paint(tab) { const body = el?.querySelector('.st-body'); if (body) { body.innerHTML = html(tab); } }
+  function paint(tab) { const body = el?.querySelector('.st-body'); if (body && current === tab) { body.innerHTML = html(tab); } } // never over another tab
   function mounted(tab, root) {
-    el = root; clearInterval(loop); loop = null;
-    if (tab === 'tuner') micOn().then(() => { loop = setInterval(tunerFrame, 80); }).catch(() => { const s = el?.querySelector('.st-sub'); if (s) s.textContent = T('Micro inaccessible.', 'Microphone unavailable.'); });
+    el = root; clearInterval(loop); loop = null; current = tab;
+    // the tuner left before the microphone opened: close it right away (it stayed open, unseen)
+    if (tab === 'tuner') micOn().then(() => { if (current !== 'tuner') return micOff(); clearInterval(loop); loop = setInterval(tunerFrame, 80); }).catch(() => { const s = el?.querySelector('.st-sub'); if (s) s.textContent = T('Micro inaccessible.', 'Microphone unavailable.'); });
     if (tab === 'bpm') loop = setInterval(bpmFrame, 20);
     if (tab === 'memo') loadMemos();
   }
-  function left(tab) { clearInterval(loop); loop = null; if (tab === 'tuner') micOff(); }
+  function left(tab) { clearInterval(loop); loop = null; if (current === tab) current = ''; if (tab === 'tuner') micOff(); }
   function click(b) {
     if (b.dataset.rec) { toggleRec(b); return true; }
     if (b.dataset.memo) { api.studioMemoOpen?.(b.dataset.memo); return true; }

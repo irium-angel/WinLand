@@ -87,10 +87,11 @@ function setup(electron) {
   });
   // ---------- screen time: how long each program was in front today (kept on this PC, 14 days) ----------
   const screenTime = (() => {
-    const day = () => new Date().toISOString().slice(0, 10);
+    const day = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }; // your day, not UTC's
     let data = readJson('screen-time.json', {}), current = '', since = Date.now(), dirty = false;
     const add = () => {
-      const now = Date.now(), d = day(); if (current && !/^(LockApp|explorer|ShellExperienceHost|SearchHost|StartMenuExperienceHost)$/i.test(current)) {
+      const now = Date.now(), d = day(), away = electron.powerMonitor.getSystemIdleTime() > 300; // nobody there for 5 min: not screen time
+      if (current && !away && !/^(LockApp|explorer|ShellExperienceHost|SearchHost|StartMenuExperienceHost)$/i.test(current)) {
         (data[d] ||= {})[current] = ((data[d] || {})[current] || 0) + Math.min(now - since, 120000); dirty = true; }
       since = now;
     };
@@ -185,6 +186,7 @@ function setup(electron) {
     watchFolder(path.join(app.getPath('pictures'), 'Screenshots'), 'shot', /\.(png|jpe?g)$/i);
     watchFolder(app.getPath('downloads'), 'download', null);
   });
+  let quitting = false, restarts = 0;
   function startVolume() {
     if (process.platform !== 'win32' || volumeChild) return;
     const [file, args] = require('./helper.cjs').command('watch', ['--parent', String(process.pid)], 'volume-watch.ps1', ['-Parent', String(process.pid)]); // winland-helper.exe, or the script
@@ -209,7 +211,12 @@ function setup(electron) {
         if (level !== undefined && level !== '') { volumeNow = { level: Number(level), muted: muted === '1' }; send('extras:volume', volumeNow); }
       }
     });
-    volumeChild.on('exit', () => { volumeChild = null; });
+    volumeChild.on('exit', () => { // it stopped (a crash, a Windows update…): start it again, everything depends on it
+      volumeChild = null;
+      for (const list of [outputWaiters, gpuWaiters, ...Object.values(answers)]) list.splice(0).forEach(done => done(null));
+      if (!quitting) { restarts++; setTimeout(startVolume, Math.min(60000, 2000 * restarts)); }
+    });
+    setTimeout(() => { if (volumeChild) restarts = 0; }, 60000); // it ran fine for a minute
   }
 
   // ---------- Bluetooth battery levels (headphones, mouse, ...) every 5 minutes ----------
@@ -270,7 +277,7 @@ Get-PnpDevice -Class Bluetooth -Status OK -ErrorAction SilentlyContinue | ForEac
     startVolume();
     setTimeout(readBluetooth, 15000); const bt = setInterval(readBluetooth, 5 * 60000); bt.unref?.();
   });
-  app.on('before-quit', () => { try { volumeChild?.kill(); } catch {} });
+  app.on('before-quit', () => { quitting = true; try { volumeChild?.kill(); } catch {} });
 }
 
 

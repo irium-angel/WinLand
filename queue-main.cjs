@@ -13,7 +13,9 @@ const fromIsland = e => /mascot\.html/.test(e.senderFrame?.url || '');
 const file = () => path.join(app.getPath('userData'), 'queue.json');
 let queue = []; try { queue = JSON.parse(fs.readFileSync(file(), 'utf8')); } catch {}
 for (const t of queue) if (t.state === 'running') t.state = 'queued'; // WinLand was closed while it ran
-let child = null;
+let child = null, starting = false;
+// stops Claude and everything it started (child.kill() would only stop cmd.exe, Claude would go on)
+const stopChild = () => { if (child?.pid) execFile('taskkill.exe', ['/PID', String(child.pid), '/T', '/F'], { windowsHide: true }, () => {}); };
 const save = () => { try { fs.writeFileSync(file(), JSON.stringify(queue.slice(-30))); } catch {} };
 const view = () => ({ ok: true, tasks: queue.slice(-12).map(({ id, prompt, project, state, at, startedAt, endedAt, answer }) => ({ id, prompt, project: path.basename(project), state, at, startedAt, endedAt, answer: String(answer || '').slice(-600) })) });
 const tell = () => { save(); island()?.webContents.send('queue:update', view()); };
@@ -26,9 +28,9 @@ function findClaude() {
   return new Promise(done => execFile('where.exe', ['claude'], { windowsHide: true }, (error, out) => done(claudeExe = error ? '' : String(out).split(/\r?\n/)[0].trim())));
 }
 async function next() {
-  if (child) return;
+  if (child || starting) return; // one task at a time, even when two are added at once
   const task = queue.find(t => t.state === 'queued'); if (!task) return;
-  const exe = await findClaude();
+  starting = true; const exe = await findClaude(); starting = false;
   if (!exe) { task.state = 'failed'; task.answer = 'Claude Code est introuvable sur ce PC.'; tell(); return next(); }
   if (!fs.existsSync(task.project)) { task.state = 'failed'; task.answer = 'Dossier introuvable.'; tell(); return next(); }
   task.state = 'running'; task.startedAt = Date.now(); task.answer = ''; tell();
@@ -58,7 +60,7 @@ ipcMain.handle('queue:add', (e, req) => {
 ipcMain.handle('queue:remove', (e, req) => {
   if (!fromIsland(e)) return null;
   const t = queue.find(x => x.id === req?.id); if (!t) return view();
-  if (t.state === 'running') { t.state = 'stopped'; try { child?.kill(); } catch {} } else queue = queue.filter(x => x !== t);
+  if (t.state === 'running') { t.state = 'stopped'; stopChild(); } else queue = queue.filter(x => x !== t);
   tell(); return view();
 });
 ipcMain.handle('queue:clear', e => { if (!fromIsland(e)) return null; queue = queue.filter(t => t.state === 'queued' || t.state === 'running'); tell(); return view(); });
@@ -70,4 +72,4 @@ ipcMain.handle('queue:projects', e => { // the folders Claude Code / Codex worke
   return { ok: true, projects: [...dirs.values()].filter(d => fs.existsSync(d)).map(d => ({ name: path.basename(d), path: d })) };
 });
 app.whenReady().then(() => setTimeout(next, 8000));
-app.on('before-quit', () => { try { child?.kill(); } catch {} });
+app.on('before-quit', stopChild);

@@ -23,11 +23,11 @@
 #winland-dashboard .dot.running{background:#ff9f0a;box-shadow:0 0 8px #ff9f0a}#winland-dashboard .dot.done{background:#30d158}#winland-dashboard .dot.question{background:#ff9f0a}#winland-dashboard .dot.error,#winland-dashboard .dot.failed{background:#ff453a}
 #winland-dashboard .bar{height:6px;border-radius:3px;background:#2c2c2e;overflow:hidden;margin-top:4px}
 #winland-dashboard .bar i{display:block;height:100%;border-radius:3px}
-#winland-dashboard .big{font-size:26px;font-weight:780;letter-spacing:-.5px}
-#winland-dashboard .db-add{display:flex;gap:6px}
+#winland-dashboard .db-item .big{font-size:26px;font-weight:780;letter-spacing:-.5px;color:#fff;line-height:1.1}
+#winland-dashboard .db-add{display:grid;grid-template-columns:1fr 28px;gap:6px}
+#winland-dashboard .db-add select{grid-column:1 / -1;max-width:none}
 #winland-dashboard select,#winland-dashboard input,#winland-dashboard button{border:0;border-radius:9px;background:#2c2c2e;color:#fff;font:600 11.5px Inter,"Segoe UI",sans-serif;height:28px;padding:0 9px}
 #winland-dashboard input{flex:1;min-width:0;font-weight:500;outline:0}
-#winland-dashboard select{max-width:110px}
 #winland-dashboard .go{background:#d97757}
 #winland-dashboard .chip{font-size:10px;font-weight:700;padding:1px 6px;border-radius:6px;background:#2c2c2e;color:#a1a1ab;flex:none;margin-top:2px}
 #winland-dashboard .x{height:20px;padding:0 6px;font-size:10px;background:transparent;color:#8e8e93}`;
@@ -53,7 +53,7 @@
     const day = new Date().toDateString(), today = (state?.history || []).filter(h => new Date(h.at).toDateString() === day);
     const files = (cc.files || []).slice(-5);
     const usage = `${bar(T('Limite 5 h', '5-hour limit'), u.fiveHour)}${bar(T('Semaine', 'Week'), u.sevenDay)}
-      <div class="db-item"><div><span>${T('Tâches aujourd’hui', 'Tasks today')}</span><span class="big" style="color:#fff">${today.length}</span></div></div>
+      <div class="db-item"><div><span>${T('Tâches aujourd’hui', 'Tasks today')}</span><span class="big">${today.length}</span></div></div>
       ${files.length ? `<small class="h">${T('Fichiers de la dernière tâche', 'Files of the last task')}</small>${files.map(f => `<div class="db-item"><div><b>${esc(String(f.path || f.name || f).split(/[\\/]/).pop())}</b><span>${esc(f.kind || '')}</span></div></div>`).join('')}` : ''}`;
     const tasks = queue.slice().reverse().map(t => `<div class="db-item"><i class="dot ${esc(t.state)}"></i><div><b title="${esc(t.prompt)}">${esc(t.prompt)}</b><span>${esc(t.project)} · ${esc(STATES[t.state] || t.state)}${t.endedAt ? ' · ' + ago(Date.now() - t.endedAt) : ''}</span>${t.answer && t.state !== 'running' ? `<span title="${esc(t.answer)}">${esc(t.answer.replace(/\s+/g, ' ').slice(-140))}</span>` : ''}</div><button type="button" class="x" data-rm="${esc(t.id)}">${t.state === 'running' ? T('Stop', 'Stop') : '✕'}</button></div>`).join('')
       || `<div class="db-item"><div><b>${T('File d’attente vide', 'The queue is empty')}</b><span>${T('Ajoute des tâches : Claude les fait l’une après l’autre.', 'Add tasks: Claude does them one after another.')}</span></div></div>`;

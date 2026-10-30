@@ -337,6 +337,10 @@ function createMascot() {
   );
 
 
+  // Over a game the island is gone; Alt+Space (the palette) brings it out, and when you leave it, it goes again.
+  mascotWindow.on('blur', () => { if (presence === 'hidden') hideIsland(); });
+
+
   mascotWindow.on(
     'closed',
 

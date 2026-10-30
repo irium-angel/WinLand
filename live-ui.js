@@ -17,8 +17,8 @@
 
   // ---------- modes ----------
   // normal · meeting (microphone off, nothing interrupts) · night (dark, quieter) · stream (island hidden and silent)
-  let mode = store.get('winland:mode', 'normal'), before = null;
-  let micMuted = false, mutedByMode = false, micUsers = []; // the microphone of the whole PC (see below)
+  let mode = store.get('winland:mode', 'normal'), before = store.get('winland:mode-before', null);
+  let micMuted = false, mutedByMode = store.get('winland:mode-muted', false), micUsers = []; // the microphone of the whole PC (see below)
   window.__winlandMode = () => mode;
   window.__winlandDnd = () => mode === 'meeting' || mode === 'stream';
   const MODES = {
@@ -29,11 +29,17 @@
   };
   function setMode(next) {
     if (!MODES[next] || next === mode) return;
-    if (mode === 'meeting' && micMuted && mutedByMode) { api.micSet(false); mutedByMode = false; }
-    if (mode === 'night' && before) { window.__winlandSetPref?.('theme', before.theme); if (before.volume != null) api.volumeSet?.(before.volume); before = null; }
+    if (mode === 'meeting' && micMuted && mutedByMode) { api.micSet(false); micMuted = false; }
+    mutedByMode = false;
+    if (mode === 'night' && before) { window.__winlandSetPref?.('theme', before.theme); if (before.volume != null) api.volumeSet?.(before.volume); }
+    before = null;
     mode = next; store.set('winland:mode', mode);
-    if (mode === 'meeting') { if (!micMuted) { api.micSet(true); mutedByMode = true; } }
-    if (mode === 'night') { before = { theme: prefs().theme, volume: window.__winlandSysVolume?.level }; window.__winlandSetPref?.('theme', 'dark'); api.volumeSet?.(30); }
+    if (mode === 'meeting' && !micMuted) { api.micSet(true); micMuted = true; mutedByMode = true; }
+    if (mode === 'night') { // dark, and the volume down to 30 % at most (never louder)
+      const level = window.__winlandSysVolume?.level; before = { theme: prefs().theme, volume: level ?? null };
+      window.__winlandSetPref?.('theme', 'dark'); if (level == null || level > 30) api.volumeSet?.(30);
+    }
+    store.set('winland:mode-before', before); store.set('winland:mode-muted', mutedByMode);
     window.__winlandUpdateQuiet?.();
     if (mode !== 'stream') flash(`${MODES[mode].icon} ${T('Mode', 'Mode')} ${T(MODES[mode].fr, MODES[mode].en)}`, 2200);
   }
@@ -41,10 +47,10 @@
 
   // ---------- a card under the island (notifications, reminders, care) ----------
   const style = document.createElement('style'); style.textContent = `
-#winland-card{position:absolute;z-index:80;left:0;top:0;width:380px;display:none;gap:12px;align-items:center;padding:12px 16px;border-radius:22px;background:#000;color:#fff;
+#winland-card{position:absolute;z-index:80;left:-999px;top:0;width:380px;display:none;gap:12px;align-items:center;padding:12px 16px;border-radius:22px;background:#000;color:#fff;
   box-shadow:0 16px 40px rgba(0,0,0,.45),0 0 0 1px rgba(255,255,255,.08);font:13px/1.35 Inter,"Segoe UI",sans-serif;pointer-events:none;
   transform-origin:50% 0;transition:opacity .25s,transform .35s cubic-bezier(.3,1.3,.5,1)}
-#winland-card.in{opacity:1}#winland-card:not(.in){opacity:0;transform:scale(.85) translateY(-10px)!important}
+#winland-card.in{opacity:1;transform:none}#winland-card:not(.in){opacity:0;transform:scale(.85) translateY(-10px)}
 #winland-card .ic{width:36px;height:36px;border-radius:11px;display:grid;place-items:center;flex:none;font-weight:800;font-size:16px;background:var(--c,#2c2c2e)}
 #winland-card .tx{min-width:0;flex:1}
 #winland-card small{display:block;color:#a1a1ab;font-size:11px;font-weight:650;letter-spacing:.02em;text-transform:uppercase}
@@ -64,14 +70,15 @@
     const c = showing;
     card.innerHTML = `<div class="ic" style="--c:${c.colour || colourOf(c.app)}">${esc(c.icon || String(c.app || '?').trim()[0]?.toUpperCase() || '•')}</div>
       <div class="tx"><small>${esc(c.app || 'WinLand')}</small><b>${esc(c.title || '')}</b>${c.body ? `<span>${esc(c.body)}</span>` : ''}</div>`;
-    card.style.display = 'flex'; requestAnimationFrame(() => card.classList.add('in'));
+    placeCard(); card.style.display = 'flex'; requestAnimationFrame(() => card.classList.add('in'));
     api.revealFor?.(c.ms || 6000); // over a big window the island comes out for the card
     window.__winlandChime?.(c.sound || 'pop');
     clearTimeout(cardTimer); cardTimer = setTimeout(next, c.ms || 6000);
   }
   window.__winlandCard = cardShow;
+  function placeCard() { card.style.left = Math.round(islandBounds.x + islandBounds.width / 2 - 190) + 'px'; card.style.top = Math.round(islandBounds.y + islandBounds.height + 10) + 'px'; }
   function place() { // under the island, wherever it is (started at the end, once everything exists)
-    if (card.style.display !== 'none') card.style.transform = `translate(${Math.round(islandBounds.x + islandBounds.width / 2 - 190)}px,${Math.round(islandBounds.y + islandBounds.height + 10)}px)`;
+    if (card.style.display !== 'none') placeCard();
     placeMic();
     requestAnimationFrame(place);
   }
@@ -92,7 +99,8 @@
   function placeMic() {
     const on = prefs().micButton !== false && (micMuted || micUsers.length) && mode !== 'stream';
     mic.style.display = on ? 'flex' : 'none'; if (!on) return;
-    mic.className = micMuted ? 'off' : ''; mic.innerHTML = (micMuted ? MIC_OFF : MIC) + (micMuted ? T('Coupé', 'Off') : '');
+    const look = (micMuted ? 'off' : 'on') + en(); // its content changes only when the state does, not every frame
+    if (mic.dataset.look !== look) { mic.dataset.look = look; mic.className = micMuted ? 'off' : ''; mic.innerHTML = (micMuted ? MIC_OFF : MIC) + (micMuted ? T('Coupé', 'Off') : ''); }
     const w = mic.offsetWidth || 30;
     mic.style.transform = `translate(${Math.round(islandBounds.x + islandBounds.width - w - 40)}px,${Math.round(islandBounds.y + Math.min(islandBounds.height, 38) / 2 - 11)}px)`;
     window.__winlandMicRect = { x: islandBounds.x + islandBounds.width - w - 40, y: islandBounds.y, width: w, height: Math.min(islandBounds.height, 38) };
@@ -156,6 +164,7 @@
   let eyesAt = Date.now(), waterAt = Date.now(), nightShown = '';
   setInterval(() => {
     const p = prefs(), now = Date.now(), d = new Date();
+    api.idleTime?.().then(r => { if ((r?.seconds || 0) > 300) eyesAt = Date.now(); }).catch(() => {}); // away: the eyes rest already
     if (window.__winlandQuiet?.() || window.__winlandDnd?.()) return;
     if (p.careEyes && now - eyesAt > 20 * 60000) { eyesAt = now; cardShow({ app: 'Pip', icon: '👀', colour: '#30d158', title: T('Repose tes yeux', 'Rest your eyes'), body: T('Regarde au loin pendant 20 secondes.', 'Look far away for 20 seconds.'), ms: 20000 }); }
     if (p.careWater && now - waterAt > 90 * 60000) { waterAt = now; cardShow({ app: 'Pip', icon: '💧', colour: '#0a84ff', title: T('Un verre d’eau ?', 'A glass of water?'), body: T('Ça fait un moment.', 'It’s been a while.'), ms: 9000 }); }
@@ -178,11 +187,13 @@
     if (prefs().smartClips === false) return null;
     const t = String(raw || '').trim(); if (!t) return null;
     if (/^[{[]/.test(t)) { try { const v = JSON.parse(t); if (typeof v === 'object' && v) return { label: T('Ranger le JSON', 'Tidy JSON'), run: () => copy(JSON.stringify(v, null, 2), T('JSON rangé et copié', 'Tidy JSON copied')) }; } catch {} }
-    const hex = /^#?([0-9a-f]{6}|[0-9a-f]{3})$/i.exec(t);
-    if (hex || /^rgba?\([\d\s.,%]+\)$/i.test(t)) { const c = hex ? '#' + hex[1] : t; return { label: T('Voir', 'See'), run: () => window.__winlandCard?.({ app: T('Couleur', 'Colour'), icon: ' ', colour: c, title: c, body: T('La couleur que tu as copiée', 'The colour you copied'), ms: 5000 }) }; }
+    // with its #, or 6 characters mixing digits and letters (ff8800): "123", "add" or "decade" are not colours
+    const hex = /^#([0-9a-f]{6}|[0-9a-f]{3})$/i.exec(t)?.[1] || (/^[0-9a-f]{6}$/i.test(t) && /\d/.test(t) && /[a-f]/i.test(t) ? t : '');
+    if (hex || /^rgba?\([\d\s.,%]+\)$/i.test(t)) { const c = hex ? '#' + hex : t; return { label: T('Voir', 'See'), run: () => window.__winlandCard?.({ app: T('Couleur', 'Colour'), icon: ' ', colour: c, title: c, body: T('La couleur que tu as copiée', 'The colour you copied'), ms: 5000 }) }; }
     if (/(error|exception|traceback|failed|erreur|err!|cannot find|is not defined|undefined is not|segmentation fault|panicked at)/i.test(t) && t.length > 12)
       return { label: T('Demander à Pip', 'Ask Pip'), run: () => window.__winlandChatAsk?.(T('Explique-moi cette erreur et comment la corriger :\n', 'Explain this error and how to fix it:\n') + t) };
-    if (/^(https?:\/\/)\S+$/i.test(t) || /^([a-z]:\|\\|~[\/])[^\n<>|"*?]+$/i.test(t)) return { label: T('Ouvrir', 'Open'), run: () => api.openCopied(t) };
+    const where = t.replace(/^"(.+)"$/, '$1'); // "Copy as path" puts quotes around it
+    if (/^(https?:\/\/)\S+$/i.test(t) || /^([a-z]:[\\/]|\\\\|~[\\/])[^\n<>|"*?]+$/i.test(where)) return { label: T('Ouvrir', 'Open'), run: () => api.openCopied(where) };
     const digits = t.replace(/[\s.\-()]/g, '');
     if (/^(\+33|0033|0)[1-9]\d{8}$/.test(digits)) { const local = digits.replace(/^(\+33|0033)/, '0'); return { label: T('Formater', 'Format'), run: () => copy(local.replace(/(\d{2})(?=\d)/g, '$1 '), T('Numéro formaté', 'Number formatted')) }; }
     if (/^\+\d{8,15}$/.test(digits)) return { label: T('Formater', 'Format'), run: () => copy(digits.replace(/^(\+\d{1,3})(\d+)$/, (m, cc, rest) => cc + ' ' + rest.replace(/(\d{3})(?=\d)/g, '$1 ')), T('Numéro formaté', 'Number formatted')) };

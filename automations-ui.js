@@ -29,8 +29,8 @@
     notification: { fr: 'Une notification arrive', en: 'A notification arrives', arg: { fr: 'app (ex. Discord)', en: 'app (e.g. Discord)' } }
   };
   const THEN = {
-    mode: { fr: 'Passer en mode', en: 'Switch to mode', arg: { fr: 'normal, meeting, night, stream', en: 'normal, meeting, night, stream' } },
-    profile: { fr: 'Passer au profil', en: 'Switch to profile', arg: { fr: 'office, dev, gaming, music, custom', en: 'office, dev, gaming, music, custom' } },
+    mode: { fr: 'Passer en mode', en: 'Switch to mode', arg: { fr: 'normal, réunion, nuit, streaming', en: 'normal, meeting, night, stream' } },
+    profile: { fr: 'Passer au profil', en: 'Switch to profile', arg: { fr: 'bureau, dev, jeu, musique, perso', en: 'office, dev, gaming, music, custom' } },
     volume: { fr: 'Mettre le son à', en: 'Set the volume to', arg: { fr: '% (ex. 40)', en: '% (e.g. 40)' } },
     open: { fr: 'Ouvrir une app', en: 'Open an app', arg: { fr: 'nom (ex. Discord)', en: 'name (e.g. Discord)' } },
     output: { fr: 'Sortie audio', en: 'Audio output', arg: { fr: 'nom (ex. casque)', en: 'name (e.g. headphones)' } },
@@ -59,12 +59,16 @@
     const r = await api.outputsGet?.().catch(() => null), n = norm(name);
     const o = (r?.outputs || []).find(x => norm(x.name).includes(n)); if (o) api.outputSet(o.id);
   }
+  // what you type, in French or English, to what WinLand calls it
+  const MODE_NAMES = { normal: 'normal', meeting: 'meeting', reunion: 'meeting', night: 'night', nuit: 'night', stream: 'stream', streaming: 'stream', live: 'stream' };
+  const PROFILE_NAMES = { office: 'office', bureau: 'office', travail: 'office', dev: 'dev', developpement: 'dev', code: 'dev', gaming: 'gaming', jeu: 'gaming', jeux: 'gaming', jeux_video: 'gaming', music: 'music', musique: 'music', studio: 'music', custom: 'custom', perso: 'custom', personnalise: 'custom' };
+  const named = (table, a, fallback) => table[norm(a).replace(/^(mode|profil|profile)\s+/, '').replace(/\s+/g, '_')] || fallback;
   let summaryWaiting = false;
   async function act([kind, arg]) {
     const a = String(arg || '').trim();
-    if (kind === 'mode') window.__winlandModes?.set(a || 'normal');
-    else if (kind === 'profile') window.__winlandSetPref?.('profile', a || 'custom');
-    else if (kind === 'volume') api.volumeSet?.(Math.max(0, Math.min(100, Number(a) || 0)));
+    if (kind === 'mode') window.__winlandModes?.set(named(MODE_NAMES, a, 'normal'));
+    else if (kind === 'profile') { const p = named(PROFILE_NAMES, a, null); if (p) window.__winlandSetPref?.('profile', p); }
+    else if (kind === 'volume') { const v = parseFloat(a); if (Number.isFinite(v)) api.volumeSet?.(Math.max(0, Math.min(100, Math.round(v)))); } // never 0 by mistake
     else if (kind === 'open') openApp(a);
     else if (kind === 'output') useOutput(a);
     else if (kind === 'theme') window.__winlandSetPref?.('theme', a === 'light' ? 'light' : 'dark');
@@ -95,9 +99,13 @@
     if (output !== null && now && now !== output) fire('output', now);
     output = now;
   }, 4000);
+  const timeOf = text => { // "23:00", "23h", "9h30", "9 h 30", "21.15" → "HH:MM"
+    const m = /^(\d{1,2})\s*[:hH.]\s*(\d{2})?\s*$/.exec(String(text || '').trim()) || /^(\d{1,2})$/.exec(String(text || '').trim());
+    return m && Number(m[1]) < 24 && Number(m[2] || 0) < 60 ? `${String(m[1]).padStart(2, '0')}:${m[2] || '00'}` : '';
+  };
   setInterval(() => { // a time of day, once
     const d = new Date(), hm = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-    if (hm !== clock) { clock = hm; for (const r of rules) if (r.on && r.when === 'time' && String(r.whenArg || '').replace(/^(\d):/, '0$1:').replace('h', ':') === hm) r.then.forEach(act); }
+    if (hm !== clock) { clock = hm; for (const r of rules) if (r.on && r.when === 'time' && timeOf(r.whenArg) === hm) r.then.forEach(act); }
   }, 15000);
   let focusWas = false;
   setInterval(() => { const on = Boolean(window.__winlandFocus?.active()); if (on !== focusWas) { fire(on ? 'focusStart' : 'focusEnd'); focusWas = on; } }, 2000);
@@ -125,7 +133,7 @@
   const style = document.createElement('style'); style.textContent = `
 #winland-rules{position:absolute;z-index:60;display:none;color:#fff;font:12px/1.4 Inter,"Segoe UI",sans-serif;pointer-events:auto}
 #winland-rules *{box-sizing:border-box}
-#winland-rules .ar-wrap{height:100%;display:grid;grid-template-columns:1.3fr 1fr;gap:12px}
+#winland-rules .ar-wrap{height:100%;display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:12px}
 #winland-rules .ar-col{min-height:0;overflow:auto;scrollbar-width:none;display:flex;flex-direction:column;gap:6px}
 #winland-rules small.h{font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:#8e8e93;font-weight:600}
 #winland-rules .ar-rule{display:flex;align-items:center;gap:10px;padding:9px 11px;border-radius:12px;background:#1c1c1e}
@@ -136,34 +144,36 @@
 #winland-rules .sw{width:34px;height:20px;border-radius:10px;background:#3a3a3c;position:relative;padding:0;flex:none}
 #winland-rules .sw::after{content:"";position:absolute;left:2px;top:2px;width:16px;height:16px;border-radius:50%;background:#fff;transition:left .2s}
 #winland-rules .sw.on{background:#30d158}#winland-rules .sw.on::after{left:16px}
-#winland-rules .ar-idea{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 10px;border-radius:10px;background:#141416}
-#winland-rules .ar-form{display:grid;gap:6px;padding:10px;border-radius:12px;background:#141416}
-#winland-rules .ar-form .row{display:flex;gap:6px}#winland-rules .ar-form .row > *{flex:1}
+#winland-rules .ar-idea{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:5px 6px 5px 10px;border-radius:10px;background:#141416;flex:none}
+#winland-rules .ar-idea button{height:24px;width:28px;padding:0}
+#winland-rules .ar-form{display:grid;grid-template-columns:minmax(0,1fr);gap:6px;padding:10px;border-radius:12px;background:#141416;flex:none}
+#winland-rules .ar-rule{flex:none}
+#winland-rules .ar-form .row{display:flex;gap:6px}#winland-rules .ar-form .row > *{flex:1;min-width:0}
 #winland-rules .add{background:#0a84ff}`;
   document.head.appendChild(style);
   const label = (table, k) => T(table[k]?.fr || k, table[k]?.en || k);
   const describe = r => `${label(WHEN, r.when)}${r.whenArg ? ' « ' + r.whenArg + ' »' : ''} → ${r.then.map(([k, a]) => label(THEN, k) + (a ? ' ' + a : '')).join(', ')}`;
-  let draft = { when: 'game', whenArg: '', then: 'mode', thenArg: 'meeting' };
+  let draft = { when: 'game', whenArg: '', then: 'mode', thenArg: '' };
   function render() {
     const mine = rules.map((r, i) => `<div class="ar-rule"><button type="button" class="sw ${r.on ? 'on' : ''}" data-toggle="${i}"></button><div><b>${esc(r.name || label(WHEN, r.when))}</b><span title="${esc(describe(r))}">${esc(describe(r))}</span></div><button type="button" data-del="${i}">✕</button></div>`).join('')
       || `<div class="ar-rule"><div><b>${T('Aucune automatisation', 'No automations yet')}</b><span>${T('Ajoute une idée à droite, ou crée la tienne.', 'Add an idea on the right, or make your own.')}</span></div></div>`;
     const ideas = IDEAS.filter(x => !rules.some(r => r.idea === x.name.fr)).map((x, i) => `<div class="ar-idea"><span>${esc(T(x.name.fr, x.name.en))}</span><button type="button" class="add" data-idea="${IDEAS.indexOf(x)}">+</button></div>`).join('');
     const opt = (table, sel) => Object.keys(table).map(k => `<option value="${k}" ${k === sel ? 'selected' : ''}>${esc(label(table, k))}</option>`).join('');
-    root.innerHTML = `<div class="ar-wrap"><div class="ar-col"><small class="h">${T('Mes automatisations', 'My automations')}</small>${mine}</div>
-      <div class="ar-col"><small class="h">${T('Idées', 'Ideas')}</small>${ideas || `<span style="color:#8e8e93">${T('Toutes ajoutées ✓', 'All added ✓')}</span>`}
-      <small class="h" style="margin-top:6px">${T('Créer', 'Create')}</small><div class="ar-form">
+    root.innerHTML = `<div class="ar-wrap"><div class="ar-col"><small class="h">${T('Créer', 'Create')}</small><div class="ar-form">
         <div class="row"><select data-f="when">${opt(WHEN, draft.when)}</select>${WHEN[draft.when].arg ? `<input data-f="whenArg" placeholder="${esc(label({ x: WHEN[draft.when].arg }, 'x'))}" value="${esc(draft.whenArg)}">` : ''}</div>
         <div class="row"><select data-f="then">${opt(THEN, draft.then)}</select>${THEN[draft.then].arg ? `<input data-f="thenArg" placeholder="${esc(label({ x: THEN[draft.then].arg }, 'x'))}" value="${esc(draft.thenArg)}">` : ''}</div>
-        <button type="button" class="add" data-create="1">${T('Ajouter', 'Add')}</button></div></div></div>`;
+        <button type="button" class="add" data-create="1">${T('Ajouter', 'Add')}</button></div>
+      <small class="h" style="margin-top:6px">${T('Mes automatisations', 'My automations')}</small>${mine}</div>
+      <div class="ar-col"><small class="h">${T('Idées', 'Ideas')}</small>${ideas || `<span style="color:#8e8e93">${T('Toutes ajoutées ✓', 'All added ✓')}</span>`}</div></div>`;
   }
   root.addEventListener('click', e => {
     const b = e.target.closest('button'); if (!b) return;
     if (b.dataset.toggle) { const r = rules[Number(b.dataset.toggle)]; r.on = !r.on; save(); render(); sound('click'); }
     else if (b.dataset.del) { rules.splice(Number(b.dataset.del), 1); save(); render(); sound('click'); }
     else if (b.dataset.idea) { const x = IDEAS[Number(b.dataset.idea)]; rules.push({ on: true, idea: x.name.fr, name: T(x.name.fr, x.name.en), when: x.when, whenArg: x.whenArg || '', then: x.then }); save(); render(); window.__winlandChime?.('pop'); }
-    else if (b.dataset.create) { rules.push({ on: true, name: label(WHEN, draft.when), when: draft.when, whenArg: WHEN[draft.when].arg ? draft.whenArg.trim() : '', then: [[draft.then, THEN[draft.then].arg ? draft.thenArg.trim() : '']] }); draft.whenArg = ''; save(); render(); window.__winlandChime?.('pop'); }
+    else if (b.dataset.create) { rules.push({ on: true, name: label(WHEN, draft.when), when: draft.when, whenArg: WHEN[draft.when].arg ? draft.whenArg.trim() : '', then: [[draft.then, THEN[draft.then].arg ? draft.thenArg.trim() : '']] }); draft.whenArg = ''; draft.thenArg = ''; save(); render(); window.__winlandChime?.('pop'); }
   });
-  root.addEventListener('change', e => { const f = e.target.dataset.f; if (f) { draft[f] = e.target.value; if (f === 'when' || f === 'then') render(); } });
+  root.addEventListener('change', e => { const f = e.target.dataset.f; if (f) { draft[f] = e.target.value; if (f === 'when' || f === 'then') { draft[f + 'Arg'] = ''; render(); } } });
   root.addEventListener('input', e => { const f = e.target.dataset.f; if (f === 'whenArg' || f === 'thenArg') draft[f] = e.target.value; });
   window.__winlandRules = { list: () => rules.map(describe), fire };
 
