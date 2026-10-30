@@ -91,6 +91,7 @@ ipcMain.handle('settings-app:get', async (e, req) => {
   if (r?.info) { dirty = !!r.info.dirty; appLang = r.info.lang === 'en' ? 'en' : 'fr'; }
   return r;
 });
+ipcMain.on('settings-app:widgets', e => { if (fromApp(e)) app.winlandWidgets?.gallery(); });
 ipcMain.on('settings-app:dirty', (e, on) => { if (fromApp(e)) dirty = !!on; }); // the AI choice is a draft in the app itself
 ipcMain.on('settings-app:theme', (e, name) => {
   if (!fromApp(e) || !THEMES[name]) return;

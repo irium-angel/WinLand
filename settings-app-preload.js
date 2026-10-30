@@ -7,6 +7,7 @@ contextBridge.exposeInMainWorld('settingsApp', {
   home: () => ipcRenderer.invoke('settings-app:home'),
   connections: () => ipcRenderer.invoke('settings-app:connections'),
   connect: (id, on) => ipcRenderer.invoke('settings-app:connect', { id, on }),
+  widgets: () => ipcRenderer.send('settings-app:widgets'), // the desktop widgets' gallery
   // AI & Chat: the Codex sign-in Pip's chat can use (ai-account-main.cjs)
   ai: {
     get: check => ipcRenderer.invoke('ai-settings:get', { check: check === true }), // check: really ask Codex (can take a moment)
