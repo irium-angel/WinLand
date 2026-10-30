@@ -115,7 +115,10 @@
     // the phone remote, on your Wi-Fi (remote-main.cjs)
     remoteInfo: () => ipcRenderer.invoke('remote:info'),
     remoteSet: on => ipcRenderer.invoke('remote:set', { on: Boolean(on) }),
-    remoteNewKey: () => ipcRenderer.invoke('remote:new-key'),
+    remoteNewCode: () => ipcRenderer.invoke('remote:new-code'),
+    remoteForget: id => ipcRenderer.invoke('remote:forget', id ? String(id) : ''),
+    onRemoteChanged: callback => subscribe('remote:changed', callback),
+    deckEditor: lang => ipcRenderer.send('deck:open-editor', lang === 'en' ? 'en' : 'fr'), // the Stream Deck editor (deck-main.cjs)
     remoteState: state => ipcRenderer.send('remote:state', state),
     onRemoteDo: callback => subscribe('remote:do', callback),
     pipDesk: on => ipcRenderer.invoke('pip:desk', Boolean(on)), // Pip on the desktop (companion-main.cjs)

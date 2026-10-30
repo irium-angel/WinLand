@@ -35,7 +35,34 @@ const send = (channel, data) => { if (win && !win.isDestroyed()) win.webContents
 async function closeRunning() {
   const me = process.pid, folder = TARGET.replace(/'/g, "''");
   await powershell(`Get-CimInstance Win32_Process | Where-Object { $_.ExecutablePath -like '${folder}\\*' -and $_.ProcessId -ne ${me} -and $_.ParentProcessId -ne ${me} } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }`);
+  // wait until they are really gone (a slower PC takes a few seconds to let go of the files)
+  for (let i = 0; i < 20; i++) {
+    const left = await powershell(`@(Get-CimInstance Win32_Process | Where-Object { $_.ExecutablePath -like '${folder}\\*' -and $_.ProcessId -ne ${me} -and $_.ParentProcessId -ne ${me} }).Count`);
+    if (!Number(String(left || '0').trim())) break;
+    await new Promise(r => setTimeout(r, 500));
+  }
   await new Promise(r => setTimeout(r, 700));
+}
+
+// One file, even when Windows still holds the old one for a moment (WinLand closing, an antivirus checking it):
+// tries again for ~20 s, and as a last resort moves the old file aside (a file in use can still be renamed).
+const LOCKED = new Set(['EPERM', 'EBUSY', 'EACCES']);
+const wait = ms => new Promise(r => setTimeout(r, ms));
+async function copyOne(from, to) {
+  for (let i = 0; ; i++) {
+    try { try { fs.chmodSync(to, 0o666); } catch {} await fs.promises.copyFile(from, to); return; }
+    catch (error) {
+      if (!LOCKED.has(error.code)) throw error;
+      if (i === 25) { try { fs.renameSync(to, `${to}.old-${Date.now()}`); continue; } catch {} }
+      if (i >= 40) { const e = new Error('locked'); e.code = 'locked'; e.file = path.basename(to); throw e; }
+      await wait(i < 10 ? 300 : 700);
+    }
+  }
+}
+// the old files moved aside last time (they are free now)
+function removeOld(dir) {
+  let items = []; try { items = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+  for (const item of items) { const p = path.join(dir, item.name); if (item.isDirectory()) removeOld(p); else if (/\.old-\d+$/.test(item.name)) try { fs.unlinkSync(p); } catch {} }
 }
 
 function listFiles(dir, base = dir, out = []) {
@@ -56,11 +83,12 @@ async function install(choice) {
   if (path.resolve(SOURCE).toLowerCase() !== path.resolve(TARGET).toLowerCase()) {
     let done = 0, last = 0;
     // an update: old app files go, your settings (in %APPDATA%) stay
+    removeOld(TARGET);
     try { fs.rmSync(path.join(TARGET, 'resources', 'app'), { recursive: true, force: true }); } catch {}
     for (const f of files) {
       const to = path.join(TARGET, f.rel);
       fs.mkdirSync(path.dirname(to), { recursive: true });
-      await fs.promises.copyFile(path.join(SOURCE, f.rel), to);
+      await copyOne(path.join(SOURCE, f.rel), to);
       done += f.size;
       if (done - last > total / 200) { last = done; step('copy', 0.04 + 0.82 * done / total); }
     }
@@ -120,7 +148,7 @@ app.whenReady().then(() => {
   win.once('ready-to-show', () => win.show());
   win.on('closed', () => { win = null; });
   const fromUs = e => e.sender === win?.webContents;
-  ipcMain.handle('setup:install', async (e, choice) => { if (!fromUs(e) || UNINSTALL) return null; try { return await install(choice || {}); } catch (error) { return { ok: false, error: error.message }; } });
+  ipcMain.handle('setup:install', async (e, choice) => { if (!fromUs(e) || UNINSTALL) return null; try { return await install(choice || {}); } catch (error) { return { ok: false, error: error.message, code: error.code === 'locked' || LOCKED.has(error.code) ? 'locked' : '', file: error.file || '' }; } });
   ipcMain.handle('setup:uninstall', async (e, choice) => { if (!fromUs(e) || !UNINSTALL) return null; try { return await uninstall(choice || {}); } catch (error) { return { ok: false, error: error.message }; } });
   ipcMain.on('setup:minimize', e => { if (fromUs(e)) win.minimize(); });
   ipcMain.on('setup:close', e => { if (fromUs(e)) finish(false); });

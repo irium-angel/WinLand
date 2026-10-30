@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'unsafe-inline'; script-src 'self' 'unsafe-inline'">
+<title>WinLand Stream Deck</title>
+<!-- The Stream Deck editor (deck-main.cjs): pages of buttons for the phone. Each change is saved right away. -->
+<script src="deck-icons.js"></script>
+<style>
+  *{box-sizing:border-box;margin:0}
+  :root{--bg:#0e0f11;--panel:#16171a;--card:#1f2024;--card2:#2a2b30;--line:rgba(255,255,255,.07);--text:#f2f2f5;--dim:#8d8e96;--accent:#4f8cff}
+  html,body{height:100%;background:var(--bg);color:var(--text);font:13px/1.45 Inter,"Segoe UI",sans-serif}
+  body{display:flex;flex-direction:column;overflow:hidden}
+  svg{display:block;flex:none}
+  header{height:44px;display:flex;align-items:center;gap:10px;padding:0 16px;-webkit-app-region:drag;border-bottom:1px solid var(--line);flex:none}
+  header .mark{width:22px;height:22px;border-radius:7px;background:var(--accent);display:grid;place-items:center;color:#fff}
+  header h1{font-size:13.5px;font-weight:650}header small{color:var(--dim);font-size:12px;margin-left:6px}
+  main{flex:1;display:grid;grid-template-columns:minmax(0,1fr) 360px;min-height:0}
+  .stage{padding:18px 22px;display:flex;flex-direction:column;gap:14px;min-width:0;overflow:auto}
+  .bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .tabs{display:flex;gap:6px;flex-wrap:wrap;flex:1;min-width:0}
+  .tab{height:30px;padding:0 13px;border:0;border-radius:15px;background:var(--card);color:var(--dim);font:600 12.5px inherit;font-family:inherit;cursor:pointer;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .tab.on{background:var(--text);color:#000}
+  button{font-family:inherit;cursor:pointer}
+  .ghost{height:30px;padding:0 11px;border:0;border-radius:9px;background:var(--card);color:var(--text);font:600 12px inherit;font-family:inherit;display:inline-flex;align-items:center;gap:6px}
+  .ghost:hover{background:var(--card2)}
+  .ghost.danger{color:#ff6961}
+  select,input,textarea{background:var(--card);border:1px solid var(--line);color:var(--text);border-radius:9px;font:500 12.5px inherit;font-family:inherit;outline:none}
+  select,input{height:32px;padding:0 10px}textarea{padding:8px 10px;resize:vertical;min-height:70px}
+  select:focus,input:focus,textarea:focus{border-color:var(--accent)}
+  .size{display:flex;align-items:center;gap:6px;color:var(--dim);font-size:12px}.size select{height:30px;padding:0 6px}
+  .phone{align-self:center;width:min(100%,520px);background:#000;border-radius:34px;padding:22px 18px;box-shadow:0 0 0 1px var(--line),0 30px 60px rgba(0,0,0,.4)}
+  .grid{display:grid;gap:10px}
+  .key{aspect-ratio:1;border-radius:16px;background:var(--c,#2c2c2e);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:6px;font-weight:600;font-size:11.5px;
+    border:0;box-shadow:inset 0 1px 0 rgba(255,255,255,.08);position:relative;overflow:hidden}
+  .key span{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .key.light{color:#111}
+  .key.empty{background:transparent;box-shadow:inset 0 0 0 1.5px var(--line);color:#4a4b52}
+  .key.empty:hover{color:var(--dim);box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.18)}
+  .key.sel{outline:2px solid var(--accent);outline-offset:3px}
+  .key.over{outline:2px dashed var(--accent);outline-offset:3px}
+  .hint{color:var(--dim);font-size:12px;text-align:center}
+  aside{background:var(--panel);border-left:1px solid var(--line);padding:18px;overflow:auto;display:flex;flex-direction:column;gap:14px}
+  aside h2{font-size:14px;font-weight:650}
+  .field{display:flex;flex-direction:column;gap:6px}
+  .field label{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--dim);font-weight:600}
+  .field .row{display:flex;gap:6px}.field .row>*{flex:1;min-width:0}
+  .icons{display:grid;grid-template-columns:repeat(8,1fr);gap:4px;max-height:156px;overflow:auto;padding:2px}
+  .icons button{aspect-ratio:1;border:0;border-radius:8px;background:var(--card);color:var(--dim);display:grid;place-items:center}
+  .icons button:hover{color:var(--text)}.icons button.on{background:var(--accent);color:#fff}
+  .colours{display:flex;gap:6px;flex-wrap:wrap}
+  .colours button{width:24px;height:24px;border-radius:50%;border:0;background:var(--c)}
+  .colours button.on{box-shadow:0 0 0 2px var(--bg),0 0 0 4px var(--text)}
+  .actions{display:flex;gap:8px;margin-top:4px}
+  .primary{height:34px;padding:0 14px;border:0;border-radius:10px;background:var(--accent);color:#fff;font:600 12.5px inherit;font-family:inherit;display:inline-flex;align-items:center;gap:7px}
+  .note{color:var(--dim);font-size:12px}
+  .saved{color:var(--dim);font-size:12px;margin-left:auto;-webkit-app-region:no-drag}
+  .toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%) translateY(20px);opacity:0;background:#2c2c2e;padding:9px 14px;border-radius:10px;font-weight:600;transition:.2s;pointer-events:none}
+  .toast.on{opacity:1;transform:translateX(-50%)}
+  .keycap{font-family:ui-monospace,Consolas,monospace;letter-spacing:.02em}
+</style></head>
+<body>
+<header><div class="mark" id="mark"></div><h1>Stream Deck<small id="subtitle"></small></h1><span class="saved" id="saved"></span></header>
+<main>
+  <section class="stage">
+    <div class="bar"><div class="tabs" id="tabs"></div>
+      <button class="ghost" id="addPage"></button>
+      <span class="size"><span id="sizeLabel"></span><select id="cols"></select>×<select id="rows"></select></span></div>
+    <div class="phone"><div class="grid" id="grid"></div></div>
+    <div class="hint" id="hint"></div>
+  </section>
+  <aside id="side"></aside>
+</main>
+<div class="toast" id="toast"></div>
+<script>
+const LANG = new URLSearchParams(location.search).get('lang') === 'en' ? 'en' : 'fr';
+const T = (fr, en) => LANG === 'en' ? en : fr;
+const I = (n, s = 18) => WinLandIcons.svg(n, s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+const $ = s => document.querySelector(s);
+let deck = null, colours = [], lists = { apps: [], scripts: [], projects: [] }, page = 0, sel = -1, saveTimer = null, drag = -1;
+
+// what a button can do: [label, default icon, default colour]
+const KINDS = {
+  media: [T('Musique', 'Music'), 'playpause', '#30d158'], volume: [T('Volume', 'Volume'), 'volume-up', '#2c2c2e'], mic: [T('Couper / rouvrir le micro', 'Mute / unmute the mic'), 'mic-off', '#ff453a'],
+  app: [T('Ouvrir une app', 'Open an app'), 'apps', '#0a84ff'], url: [T('Ouvrir un lien', 'Open a link'), 'globe', '#64d2ff'], open: [T('Ouvrir un fichier ou un dossier', 'Open a file or folder'), 'folder', '#ff9f0a'],
+  script: [T('Lancer un script', 'Run a script'), 'terminal', '#2c2c2e'], keys: [T('Raccourci clavier', 'Keyboard shortcut'), 'keyboard', '#5e5ce6'], text: [T('Taper un texte', 'Type a text'), 'text', '#5e5ce6'],
+  mode: [T('Mode WinLand', 'WinLand mode'), 'layers', '#5e5ce6'], focus: [T('Lancer / arrêter un focus', 'Start / stop a focus'), 'focus', '#bf5af2'], timer: [T('Minuteur', 'Timer'), 'timer', '#ff9f0a'],
+  screenshot: [T('Capture d’écran', 'Screenshot'), 'screenshot', '#0a84ff'], lock: [T('Verrouiller le PC', 'Lock the PC'), 'lock', '#8e8e93'], claude: [T('Tâche pour Claude Code', 'Task for Claude Code'), 'claude', '#d97757'],
+  page: [T('Aller à une page', 'Go to a page'), 'layers', '#3a3a3c']
+};
+const MODES = [['normal', 'Normal', 'Normal'], ['meeting', 'Réunion', 'Meeting'], ['night', 'Nuit', 'Night'], ['stream', 'Streaming', 'Streaming']];
+const isLight = hex => { const n = parseInt(String(hex || '#000').slice(1), 16); return ((n >> 16) * 299 + ((n >> 8) & 255) * 587 + (n & 255) * 114) / 1000 > 170; };
+function toast(text) { const t = $('#toast'); t.textContent = text; t.classList.add('on'); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('on'), 1600); }
+
+// ---------- saving ----------
+function changed(redraw = true) {
+  $('#saved').textContent = T('Enregistrement…', 'Saving…');
+  clearTimeout(saveTimer); saveTimer = setTimeout(async () => { const r = await window.deckApp.set(deck); if (r?.ok) { deck = r.deck; $('#saved').textContent = T('Enregistré · visible sur le téléphone', 'Saved · on the phone'); } }, 300);
+  if (redraw) draw();
+}
+const buttons = () => deck.pages[page].buttons;
+
+// ---------- the grid ----------
+function draw() {
+  $('#tabs').innerHTML = deck.pages.map((p, i) => `<button class="tab ${i === page ? 'on' : ''}" data-tab="${i}" title="${esc(p.name)}">${esc(p.name)}</button>`).join('');
+  $('#cols').value = deck.cols; $('#rows').value = deck.rows;
+  const g = $('#grid'); g.style.gridTemplateColumns = `repeat(${deck.cols},1fr)`;
+  g.innerHTML = buttons().map((k, i) => k ? `<button class="key ${isLight(k.colour) ? 'light' : ''} ${i === sel ? 'sel' : ''}" style="--c:${esc(k.colour)}" data-i="${i}" draggable="true">${I(k.icon, 28)}<span>${esc(k.label)}</span></button>`
+    : `<button class="key empty ${i === sel ? 'sel' : ''}" data-i="${i}">${I('plus', 22)}</button>`).join('');
+  side();
+}
+$('#grid').addEventListener('click', e => { const k = e.target.closest('[data-i]'); if (!k) return; sel = Number(k.dataset.i); if (!buttons()[sel]) { buttons()[sel] = { label: '', icon: 'star', colour: '#2c2c2e', action: { kind: 'app' } }; changed(false); } draw(); });
+// drag a button onto another place: they swap
+$('#grid').addEventListener('dragstart', e => { const k = e.target.closest('[data-i]'); drag = k ? Number(k.dataset.i) : -1; e.dataTransfer.effectAllowed = 'move'; });
+$('#grid').addEventListener('dragover', e => { const k = e.target.closest('[data-i]'); if (drag < 0 || !k) return; e.preventDefault(); document.querySelectorAll('.key.over').forEach(x => x.classList.remove('over')); k.classList.add('over'); });
+$('#grid').addEventListener('drop', e => { const k = e.target.closest('[data-i]'); if (drag < 0 || !k) return; e.preventDefault(); const to = Number(k.dataset.i), b = buttons(); [b[drag], b[to]] = [b[to], b[drag]]; sel = to; drag = -1; changed(); });
+$('#grid').addEventListener('dragend', () => { drag = -1; document.querySelectorAll('.key.over').forEach(x => x.classList.remove('over')); });
+$('#tabs').addEventListener('click', e => { const t = e.target.closest('[data-tab]'); if (t) { page = Number(t.dataset.tab); sel = -1; draw(); } });
+$('#addPage').addEventListener('click', () => { if (deck.pages.length >= 12) return; deck.pages.push({ name: `Page ${deck.pages.length + 1}`, buttons: Array(deck.cols * deck.rows).fill(null) }); page = deck.pages.length - 1; sel = -1; changed(); });
+function resize(cols, rows) {
+  const n = cols * rows, lost = deck.pages.some(p => p.buttons.slice(n).some(Boolean));
+  if (lost && !confirm(T('Des boutons sont en dehors de la nouvelle grille et seront effacés. Continuer ?', 'Some buttons are outside the new grid and will be removed. Continue?'))) { draw(); return; }
+  deck.cols = cols; deck.rows = rows; for (const p of deck.pages) p.buttons = Array.from({ length: n }, (_, i) => p.buttons[i] || null); sel = -1; changed();
+}
+$('#cols').addEventListener('change', e => resize(Number(e.target.value), deck.rows));
+$('#rows').addEventListener('change', e => resize(deck.cols, Number(e.target.value)));
+
+// ---------- the inspector ----------
+const opt = (pairs, value) => pairs.map(([v, label]) => `<option value="${esc(v)}" ${String(v) === String(value ?? '') ? 'selected' : ''}>${esc(label)}</option>`).join('');
+function actionFields(a) {
+  switch (a.kind) {
+    case 'media': return `<div class="field"><label>${T('Commande', 'Command')}</label><select data-a="op">${opt([['playpause', T('Lecture / pause', 'Play / pause')], ['next', T('Suivant', 'Next')], ['prev', T('Précédent', 'Previous')]], a.op || 'playpause')}</select></div>`;
+    case 'volume': return `<div class="field"><label>${T('Commande', 'Command')}</label><div class="row"><select data-a="op">${opt([['up', T('Monter', 'Up')], ['down', T('Baisser', 'Down')], ['mute', T('Couper / remettre', 'Mute / unmute')], ['set', T('Régler à', 'Set to')]], a.op || 'up')}</select>
+      ${a.op === 'mute' ? '' : `<input data-a="value" type="number" min="1" max="100" placeholder="${a.op === 'set' ? '%' : T('pas : 5', 'step: 5')}" value="${esc(a.value || '')}">`}</div></div>`;
+    case 'app': return `<div class="field"><label>${T('App (menu Démarrer)', 'App (Start menu)')}</label><input data-a="name" list="appsList" placeholder="${T('Tape le nom…', 'Type its name…')}" value="${esc(a.name || '')}"><datalist id="appsList">${lists.apps.map(n => `<option value="${esc(n)}">`).join('')}</datalist></div>`;
+    case 'script': return `<div class="field"><label>Script</label><select data-a="name"><option value="">—</option>${opt(lists.scripts.map(n => [n, n]), a.name)}</select>
+      <button class="ghost" data-do="scripts">${I('folder', 15)}${T('Ouvrir le dossier des scripts', 'Open the scripts folder')}</button><span class="note">${T('.ps1, .cmd, .bat, .js (Bun) ou .py', '.ps1, .cmd, .bat, .js (Bun) or .py')}</span></div>`;
+    case 'url': return `<div class="field"><label>${T('Lien', 'Link')}</label><input data-a="url" placeholder="https://… , spotify:… , ms-settings:…" value="${esc(a.url || '')}"></div>`;
+    case 'open': return `<div class="field"><label>${T('Fichier ou dossier', 'File or folder')}</label><input data-a="path" placeholder="C:\\…" value="${esc(a.path || '')}"><div class="row"><button class="ghost" data-do="file">${I('file', 15)}${T('Fichier…', 'File…')}</button><button class="ghost" data-do="folder">${I('folder', 15)}${T('Dossier…', 'Folder…')}</button></div></div>`;
+    case 'keys': return `<div class="field"><label>${T('Raccourci', 'Shortcut')}</label><input class="keycap" data-a="keys" data-capture="1" readonly placeholder="${T('Clique ici puis fais le raccourci', 'Click here, then press the shortcut')}" value="${esc(a.keys || '')}">
+      <span class="note">${T('Il est tapé dans la fenêtre au premier plan (ex. ctrl+shift+m pour couper Teams, f9, win+d).', 'It goes to the window in front (e.g. ctrl+shift+m to mute Teams, f9, win+d).')}</span></div>`;
+    case 'text': return `<div class="field"><label>${T('Texte', 'Text')}</label><textarea data-a="text" placeholder="${T('Tapé dans la fenêtre au premier plan', 'Typed in the window in front')}">${esc(a.text || '')}</textarea></div>`;
+    case 'mode': return `<div class="field"><label>${T('Mode', 'Mode')}</label><select data-a="mode">${opt(MODES.map(([v, f, e]) => [v, T(f, e)]), a.mode || 'normal')}</select></div>`;
+    case 'timer': return `<div class="field"><label>${T('Minuteur', 'Timer')}</label><div class="row"><input data-a="minutes" type="number" min="1" placeholder="${T('minutes', 'minutes')}" value="${esc(a.minutes || '')}"><input data-a="label" placeholder="${T('pour quoi (facultatif)', 'what for (optional)')}" value="${esc(a.label || '')}"></div></div>`;
+    case 'claude': return `<div class="field"><label>${T('Projet', 'Project')}</label><select data-a="project">${opt(lists.projects.map(p => [p.path, p.name]), a.project || lists.projects[0]?.path)}</select></div>
+      <div class="field"><label>${T('Tâche', 'Task')}</label><textarea data-a="prompt" placeholder="${T('Ex. lance les tests et corrige ce qui casse', 'E.g. run the tests and fix what breaks')}">${esc(a.prompt || '')}</textarea><span class="note">${T('Ajoutée à la file du tableau de bord Claude.', 'Added to the Claude dashboard queue.')}</span></div>`;
+    case 'page': return `<div class="field"><label>${T('Page', 'Page')}</label><select data-a="page">${opt(deck.pages.map((p, i) => [i, p.name]), a.page || 0)}</select></div>`;
+    default: return `<span class="note">${T('Rien à régler.', 'Nothing to set.')}</span>`;
+  }
+}
+function side() {
+  const k = sel >= 0 ? buttons()[sel] : null, p = deck.pages[page];
+  if (!k) {
+    $('#side').innerHTML = `<h2>${T('Page', 'Page')}</h2>
+      <div class="field"><label>${T('Nom', 'Name')}</label><input data-page-name="1" maxlength="30" value="${esc(p.name)}"></div>
+      ${deck.pages.length > 1 ? `<button class="ghost danger" data-do="delPage">${I('trash', 15)}${T('Supprimer cette page', 'Delete this page')}</button>` : ''}
+      <span class="note">${T('Clique sur une case pour créer ou modifier un bouton. Glisse un bouton sur une autre case pour les échanger.', 'Click a square to make or change a button. Drag a button onto another square to swap them.')}</span>
+      <div style="flex:1"></div><button class="ghost" data-do="reset">${I('refresh', 15)}${T('Remettre le Stream Deck de départ', 'Back to the starting Stream Deck')}</button>`;
+    return;
+  }
+  $('#side').innerHTML = `<h2>${T('Bouton', 'Button')}</h2>
+    <div class="field"><label>${T('Action', 'Action')}</label><select data-kind="1">${opt(Object.entries(KINDS).map(([v, [l]]) => [v, l]), k.action.kind)}</select></div>
+    ${actionFields(k.action)}
+    <div class="field"><label>${T('Texte du bouton', 'Button text')}</label><input data-label="1" maxlength="30" placeholder="${esc(KINDS[k.action.kind][0])}" value="${esc(k.label)}"></div>
+    <div class="field"><label>${T('Icône', 'Icon')}</label><div class="icons">${WinLandIcons.names.map(n => `<button data-icon="${n}" class="${n === k.icon ? 'on' : ''}" title="${n}">${I(n, 17)}</button>`).join('')}</div></div>
+    <div class="field"><label>${T('Couleur', 'Colour')}</label><div class="colours">${colours.map(c => `<button data-colour="${c}" class="${c === k.colour ? 'on' : ''}" style="--c:${c}" aria-label="${c}"></button>`).join('')}</div></div>
+    <div class="actions"><button class="primary" data-do="try">${I('play', 15)}${T('Essayer', 'Try it')}</button><button class="ghost danger" data-do="clear">${I('trash', 15)}${T('Vider la case', 'Clear')}</button></div>`;
+}
+$('#side').addEventListener('change', e => {
+  const t = e.target, k = sel >= 0 ? buttons()[sel] : null;
+  if (t.dataset.pageName) { deck.pages[page].name = t.value.trim() || `Page ${page + 1}`; return changed(); }
+  if (!k) return;
+  if (t.dataset.kind) { // a new kind of action: its usual icon and colour, unless you already chose them
+    const [, icon, colour] = KINDS[t.value], was = KINDS[k.action.kind];
+    if (!k.icon || k.icon === was[1] || k.icon === 'star') k.icon = icon;
+    if (!k.colour || k.colour === was[2] || k.colour === '#2c2c2e') k.colour = colour;
+    k.action = { kind: t.value }; return changed();
+  }
+  if (t.dataset.a) { k.action[t.dataset.a] = t.value; return changed(t.dataset.a === 'op'); }
+  if (t.dataset.label != null) { k.label = t.value; return changed(); }
+});
+$('#side').addEventListener('input', e => { const t = e.target, k = sel >= 0 ? buttons()[sel] : null; if (k && (t.dataset.a || t.dataset.label != null) && t.tagName !== 'SELECT' && !t.dataset.capture) { if (t.dataset.a) k.action[t.dataset.a] = t.value; else k.label = t.value; changed(false); $('#grid').querySelector(`[data-i="${sel}"] span`)?.replaceChildren(k.label); } });
+// the shortcut field: press the keys, it writes them (ctrl+shift+m)
+$('#side').addEventListener('keydown', e => {
+  const t = e.target; if (!t.dataset.capture) return; e.preventDefault();
+  const names = { Control: 'ctrl', Shift: 'shift', Alt: 'alt', Meta: 'win', ' ': 'space', Escape: 'esc', Enter: 'enter', ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down', Backspace: 'backspace', Delete: 'delete', Tab: 'tab', PageUp: 'pageup', PageDown: 'pagedown', Home: 'home', End: 'end', Insert: 'insert' };
+  const key = names[e.key] || (/^F\d{1,2}$/.test(e.key) ? e.key.toLowerCase() : /^Key[A-Z]$/.test(e.code) ? e.code.slice(3).toLowerCase() : /^Digit\d$/.test(e.code) ? e.code.slice(5) : '');
+  if (!key) return;
+  const mods = [e.ctrlKey && 'ctrl', e.shiftKey && 'shift', e.altKey && 'alt', e.metaKey && 'win'].filter(Boolean);
+  const spec = ['ctrl', 'shift', 'alt', 'win'].includes(key) ? mods.join('+') : [...mods, key].join('+');
+  t.value = spec; buttons()[sel].action.keys = spec; changed(false);
+});
+$('#side').addEventListener('click', async e => {
+  const b = e.target.closest('button'); if (!b) return; const k = sel >= 0 ? buttons()[sel] : null;
+  if (b.dataset.icon && k) { k.icon = b.dataset.icon; return changed(); }
+  if (b.dataset.colour && k) { k.colour = b.dataset.colour; return changed(); }
+  const what = b.dataset.do;
+  if (what === 'try' && k) { const r = await window.deckApp.tryAction(k.action); toast(r?.ok ? T('Fait', 'Done') : T('Ça n’a pas marché : vérifie les réglages du bouton', 'That did not work: check the button’s settings')); }
+  else if (what === 'clear' && k) { buttons()[sel] = null; sel = -1; changed(); }
+  else if ((what === 'file' || what === 'folder') && k) { const r = await window.deckApp.pick(what === 'folder'); if (r?.ok) { k.action.path = r.path; if (!k.label) k.label = r.path.split(/[\\/]/).pop().slice(0, 30); changed(); } }
+  else if (what === 'scripts') { await window.deckApp.scriptsFolder(); setTimeout(async () => { lists = { ...lists, ...(await window.deckApp.lists()) }; draw(); }, 4000); }
+  else if (what === 'delPage' && deck.pages.length > 1 && confirm(T('Supprimer cette page et ses boutons ?', 'Delete this page and its buttons?'))) { deck.pages.splice(page, 1); page = Math.max(0, page - 1); changed(); }
+  else if (what === 'reset' && confirm(T('Remplacer tout ton Stream Deck par celui de départ ?', 'Replace your whole Stream Deck with the starting one?'))) { const r = await window.deckApp.reset(); if (r?.ok) { deck = r.deck; page = 0; sel = -1; draw(); } }
+});
+
+// ---------- start ----------
+(async () => {
+  $('#mark').innerHTML = I('grid', 14); $('#subtitle').textContent = T('· les boutons de ton téléphone', '· the buttons on your phone');
+  $('#addPage').innerHTML = `${I('plus', 15)}${T('Page', 'Page')}`; $('#sizeLabel').textContent = T('Grille', 'Grid');
+  $('#cols').innerHTML = [2, 3, 4, 5, 6].map(n => `<option>${n}</option>`).join(''); $('#rows').innerHTML = [1, 2, 3, 4, 5].map(n => `<option>${n}</option>`).join('');
+  $('#hint').textContent = T('Sur le téléphone : page Téléphone de WinLand, scanne le QR code, puis l’onglet Stream Deck.', 'On the phone: WinLand’s Phone page, scan the QR code, then the Stream Deck tab.');
+  const r = await window.deckApp.get(); deck = r.deck; colours = r.colours; draw();
+  const l = await window.deckApp.lists(); if (l?.ok) { lists = l; if (sel >= 0) side(); }
+})();
+</script>
+</body></html>

@@ -1,60 +1,169 @@
 <!doctype html>
-<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#08080c"><title>WinLand</title>
-<!-- WinLand on your phone (remote-main.cjs serves it on your Wi-Fi). The key comes from the QR code (#k=…) and stays on this phone. -->
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#0b0b0f"><title>WinLand</title>
+<!-- WinLand on your phone (remote-main.cjs serves it on your Wi-Fi). First the 6-digit code shown in WinLand, then the
+     remote or the Stream Deck. The phone's own secret stays in this browser; it never sees what a deck button does. -->
+<script src="/icons.js"></script>
 <style>
-  *{box-sizing:border-box;margin:0}
-  body{background:#08080c;color:#f5f5f7;font:16px/1.4 -apple-system,"SF Pro Text","Segoe UI",Roboto,sans-serif;padding:max(18px,env(safe-area-inset-top)) 16px 30px;min-height:100vh}
-  header{display:flex;align-items:center;gap:12px;margin-bottom:18px}
-  .pip{width:46px;height:40px;border-radius:14px;background:linear-gradient(#fff,#dedee6);position:relative;flex:none}
-  .pip i{position:absolute;top:12px;width:8px;height:14px;border-radius:5px;background:var(--e,#1c1c1e);transition:background .3s}
-  .pip i:first-child{left:13px}.pip i:last-child{right:13px}
-  h1{font-size:22px;letter-spacing:-.4px}h1 small{display:block;font-size:13px;color:#8e8e93;font-weight:500;letter-spacing:0}
-  .card{background:#16161b;border-radius:20px;padding:16px;margin-bottom:12px}
-  .card small{display:block;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:#8e8e93;font-weight:600;margin-bottom:8px}
-  .card b{display:block;font-size:18px}.card p{color:#a1a1ab;font-size:14px;margin-top:4px;word-break:break-word}
-  .row{display:flex;gap:10px;margin-top:12px}
-  button{flex:1;height:50px;border:0;border-radius:14px;background:#2c2c2e;color:#fff;font:600 16px inherit;font-family:inherit}
-  button:active{transform:scale(.97)}
-  .ok{background:#30d158}.no{background:#ff453a}.main{background:linear-gradient(135deg,#7c5cff,#1aa7ff)}
-  .lamp{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:8px;background:#636366;vertical-align:1px}
-  .err{color:#ff9f0a;text-align:center;margin-top:30px}
+  *{box-sizing:border-box;margin:0;-webkit-tap-highlight-color:transparent}
+  :root{--bg:#0b0b0f;--card:#16161c;--card2:#1f1f27;--line:rgba(255,255,255,.07);--text:#f5f5f7;--dim:#8e8e98;--accent:#4f8cff;--ok:#30d158;--bad:#ff453a;--warn:#ff9f0a}
+  html,body{background:var(--bg);color:var(--text);font:15px/1.4 -apple-system,"SF Pro Text","Segoe UI",Roboto,sans-serif}
+  body{padding:max(16px,env(safe-area-inset-top)) 16px max(24px,env(safe-area-inset-bottom));min-height:100vh;-webkit-user-select:none;user-select:none}
+  svg{display:block;flex:none}
+  header{display:flex;align-items:center;gap:12px;margin-bottom:16px}
+  .logo{width:38px;height:34px;border-radius:11px;background:linear-gradient(#fff,#dedee6);position:relative;flex:none}
+  .logo i{position:absolute;top:10px;width:6px;height:12px;border-radius:4px;background:var(--e,#1c1c1e);transition:background .3s}
+  .logo i:first-child{left:11px}.logo i:last-child{right:11px}
+  h1{font-size:19px;letter-spacing:-.3px;font-weight:700}
+  #sub{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--dim)}
+  #sub b{width:7px;height:7px;border-radius:50%;background:var(--dim)}#sub.on b{background:var(--ok)}#sub.off b{background:var(--bad)}
+  .seg{display:grid;grid-template-columns:1fr 1fr;background:var(--card);border-radius:12px;padding:3px;margin-bottom:14px}
+  .seg button{height:36px;border:0;border-radius:9px;background:none;color:var(--dim);font:600 14px inherit;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:7px}
+  .seg button.on{background:var(--card2);color:var(--text)}
+  .card{background:var(--card);border-radius:18px;padding:14px;margin-bottom:10px}
+  .cap{display:flex;align-items:center;gap:7px;font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--dim);font-weight:600;margin-bottom:8px}
+  .title{font-size:17px;font-weight:650;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .line{color:var(--dim);font-size:13.5px;margin-top:3px;word-break:break-word;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+  .lamp{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:8px;background:#55555f;vertical-align:1px}
+  .row{display:flex;gap:8px;margin-top:12px}
+  .btn{flex:1;height:48px;border:0;border-radius:13px;background:var(--card2);color:var(--text);font:600 15px inherit;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px}
+  .btn:active,.key:active{transform:scale(.96)}
+  .btn.ok{background:var(--ok);color:#04130a}.btn.bad{background:var(--bad)}.btn.main{background:var(--accent)}.btn.on{background:rgba(255,69,58,.18);color:#ff6961}
+  .chips{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+  .chip{height:62px;border:0;border-radius:13px;background:var(--card2);color:var(--dim);font:600 12px inherit;font-family:inherit;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px}
+  .chip.on{background:rgba(79,140,255,.18);color:#8db4ff}
+  /* Stream Deck */
+  .pages{display:flex;gap:6px;overflow-x:auto;margin-bottom:10px;scrollbar-width:none}
+  .pages button{flex:none;height:32px;padding:0 14px;border:0;border-radius:16px;background:var(--card);color:var(--dim);font:600 13px inherit;font-family:inherit}
+  .pages button.on{background:var(--text);color:#000}
+  .deck{display:grid;gap:9px}
+  .key{aspect-ratio:1;border:0;border-radius:16px;background:var(--c,#2c2c2e);color:#fff;font:600 11.5px inherit;font-family:inherit;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:6px;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 2px 8px rgba(0,0,0,.35);transition:transform .08s,filter .2s;overflow:hidden}
+  .key span{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .key.light{color:#111}.key.empty{background:transparent;box-shadow:inset 0 0 0 1.5px var(--line)}
+  .key.done{filter:brightness(1.35)}.key.fail{animation:shake .3s}
+  @keyframes shake{25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
+  /* pairing */
+  .pair{max-width:380px;margin:9vh auto 0;text-align:center}
+  .pair .big{width:64px;height:64px;border-radius:20px;background:var(--card);display:grid;place-items:center;margin:0 auto 18px;color:var(--accent)}
+  .pair h2{font-size:22px;letter-spacing:-.4px}.pair p{color:var(--dim);margin-top:8px;font-size:14.5px}
+  .code{margin:26px auto 14px;width:100%;height:64px;border:0;border-radius:16px;background:var(--card);color:var(--text);text-align:center;font:700 30px ui-monospace,"SF Mono",Menlo,monospace;letter-spacing:.45em;padding-left:.45em;outline:none}
+  .code:focus{box-shadow:0 0 0 2px var(--accent)}
+  .err{color:var(--warn);font-size:13.5px;min-height:20px}
+  .foot{margin-top:18px;text-align:center}.foot button{border:0;background:none;color:var(--dim);font:500 13px inherit;font-family:inherit;padding:8px}
+  .empty-note{color:var(--dim);text-align:center;padding:24px 8px;font-size:14px}
 </style></head>
 <body>
-<header><div class="pip" id="pip"><i></i><i></i></div><h1>WinLand<small id="sub">…</small></h1></header>
+<header><div class="logo" id="logo"><i></i><i></i></div><div><h1>WinLand</h1><div id="sub"><b></b><span id="subText">…</span></div></div></header>
 <div id="app"></div>
 <script>
-const KEY = (() => { const m = /[#&]k=([0-9a-f]{32})/.exec(location.hash); if (m) { try { localStorage.setItem('winland-key', m[1]); } catch {} history.replaceState(null, '', location.pathname); return m[1]; } try { return localStorage.getItem('winland-key') || ''; } catch { return ''; } })();
+const I = (name, size = 20) => window.WinLandIcons ? WinLandIcons.svg(name, size) : '';
 const fr = !/^en/i.test(navigator.language || '');
 const T = (a, b) => fr ? a : b;
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+const store = { get: k => { try { return localStorage.getItem(k) || ''; } catch { return ''; } }, set: (k, v) => { try { v ? localStorage.setItem(k, v) : localStorage.removeItem(k); } catch {} } };
+let TOKEN = store.get('winland-token'), view = store.get('winland-view') || 'remote', last = null, deckData = null, deckPage = 0, timer = null;
 const COLOURS = { running: '#ff9f0a', question: '#ff9f0a', done: '#30d158', error: '#ff453a' };
-const STATES = { running: T('Claude travaille…', 'Claude is working…'), question: T('Claude attend ta réponse', 'Claude is waiting for you'), done: T('Claude a fini', 'Claude is done'), error: T('Erreur', 'Error'), ready: T('Prêt', 'Ready') };
-let last = null;
+const STATES = { running: T('Claude travaille', 'Claude is working'), question: T('Claude attend ta réponse', 'Claude is waiting for you'), done: T('Claude a fini', 'Claude is done'), error: T('Erreur', 'Error'), ready: T('Prêt', 'Ready') };
+const $app = document.getElementById('app');
+function status(text, kind) { document.getElementById('subText').textContent = text; document.getElementById('sub').className = kind || ''; }
+
 async function call(path, body) {
-  const r = await fetch(path, { method: body ? 'POST' : 'GET', headers: { 'X-WinLand-Key': KEY, 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined, cache: 'no-store' });
-  if (r.status === 403) throw new Error('key'); return r.json();
+  const r = await fetch(path, { method: body ? 'POST' : 'GET', headers: { 'X-WinLand-Token': TOKEN, 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined, cache: 'no-store' });
+  const data = await r.json().catch(() => ({}));
+  if (r.status === 403 && data.error === 'pair') { TOKEN = ''; store.set('winland-token', ''); throw new Error('pair'); }
+  return data;
 }
-const act = (kind, extra = {}) => call('/api/do', { kind, ...extra }).then(() => setTimeout(load, 500)).catch(() => {});
-function draw(s) {
-  const app = document.getElementById('app'), c = s.claude || {}, m = s.music || {}, f = s.focus || {};
-  document.getElementById('pip').style.setProperty('--e', COLOURS[c.state] || '#1c1c1e');
-  document.getElementById('sub').textContent = T('Connecté à ton PC', 'Connected to your PC');
-  const ask = c.permission ? `<div class="card"><small>${T('Claude demande', 'Claude asks')}</small><b>${esc(c.permission)}</b>${c.permissionDetail ? `<p>${esc(c.permissionDetail)}</p>` : ''}
-      <div class="row"><button class="ok" data-a="allow">${T('Autoriser', 'Allow')}</button><button class="no" data-a="deny">${T('Refuser', 'Deny')}</button></div></div>` : '';
-  app.innerHTML = `${ask}
-    <div class="card"><small>Claude Code</small><b><span class="lamp" style="background:${COLOURS[c.state] || '#636366'}"></span>${esc(STATES[c.state] || T('Rien en cours', 'Nothing running'))}</b>${c.project ? `<p>${esc(c.project)}${c.detail ? ' · ' + esc(c.detail) : ''}</p>` : ''}${c.question ? `<p>${esc(c.question)}</p>` : ''}</div>
-    <div class="card"><small>${T('Musique', 'Music')}</small><b>${esc(m.title || T('Rien ne joue', 'Nothing playing'))}</b>${m.artist ? `<p>${esc(m.artist)}</p>` : ''}
-      <div class="row"><button data-a="previous">⏮</button><button class="main" data-a="${m.playing ? 'pause' : 'play'}">${m.playing ? '⏸' : '▶'}</button><button data-a="next">⏭</button></div></div>
-    <div class="card"><small>Focus</small><b>${f.active ? esc(f.label) : T('Pas de focus en cours', 'No focus running')}</b><div class="row"><button data-a="focus">${f.active ? T('Arrêter', 'Stop') : T('Lancer un focus', 'Start a focus')}</button><button data-a="mic" class="${s.micMuted ? 'no' : ''}">${s.micMuted ? T('🎙 Micro coupé', '🎙 Mic off') : T('🎙 Couper le micro', '🎙 Mute mic')}</button></div></div>`;
+
+// ---------- pairing ----------
+function pairScreen(message) {
+  clearInterval(timer); status(T('Pas encore connecté', 'Not connected yet'), 'off');
+  $app.innerHTML = `<div class="pair"><div class="big">${I('lock', 30)}</div>
+    <h2>${T('Entre le code', 'Enter the code')}</h2>
+    <p>${T('Il s’affiche dans WinLand, sur la page Téléphone.', 'It is shown in WinLand, on the Phone page.')}</p>
+    <input class="code" id="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="······" aria-label="${T('Code à 6 chiffres', '6-digit code')}">
+    <div class="err" id="err">${esc(message || '')}</div>
+    <div class="row"><button class="btn main" id="go">${I('check', 18)}${T('Connecter', 'Connect')}</button></div></div>`;
+  const input = document.getElementById('code');
+  input.addEventListener('input', () => { input.value = input.value.replace(/\D/g, '').slice(0, 6); if (input.value.length === 6) pair(input.value); });
+  document.getElementById('go').addEventListener('click', () => pair(input.value));
+  setTimeout(() => input.focus(), 200);
+}
+async function pair(code) {
+  const err = document.getElementById('err');
+  if (!/^\d{6}$/.test(code)) { err.textContent = T('Le code a 6 chiffres.', 'The code has 6 digits.'); return; }
+  const name = /iphone/i.test(navigator.userAgent) ? 'iPhone' : /ipad/i.test(navigator.userAgent) ? 'iPad' : /android/i.test(navigator.userAgent) ? 'Android' : T('Téléphone', 'Phone');
+  try {
+    const r = await fetch('/api/pair', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code, name }), cache: 'no-store' }).then(x => x.json());
+    if (r.ok && r.token) { TOKEN = r.token; store.set('winland-token', TOKEN); if (navigator.vibrate) navigator.vibrate(20); show(view); return; }
+    document.getElementById('code').value = '';
+    err.textContent = r.error === 'locked' ? T(`Trop d’essais : attends ${r.wait} s.`, `Too many tries: wait ${r.wait} s.`)
+      : r.left === 0 ? T('Trop d’essais : un nouveau code s’affiche dans WinLand.', 'Too many tries: WinLand shows a new code.') : T('Ce n’est pas le bon code.', 'That is not the right code.');
+  } catch { err.textContent = T('PC injoignable (même Wi-Fi ? télécommande allumée ?)', 'PC unreachable (same Wi-Fi? remote on?)'); }
+}
+
+// ---------- the two modes ----------
+function frame(inner) {
+  return `<div class="seg"><button data-view="remote" class="${view === 'remote' ? 'on' : ''}">${I('remote', 17)}${T('Télécommande', 'Remote')}</button><button data-view="deck" class="${view === 'deck' ? 'on' : ''}">${I('grid', 17)}Stream Deck</button></div>
+    <div id="body">${inner}</div><div class="foot"><button data-forget="1">${T('Déconnecter ce téléphone', 'Disconnect this phone')}</button></div>`;
+}
+function show(next) {
+  view = next === 'deck' ? 'deck' : 'remote'; store.set('winland-view', view);
+  $app.innerHTML = frame(''); clearInterval(timer);
+  if (view === 'remote') { loadState(); timer = setInterval(loadState, 2000); } else { loadDeck(); timer = setInterval(() => { if (!document.hidden) loadDeck(true); }, 5000); } // every 5 s: the buttons you change on the PC arrive here
+}
+const lost = e => { if (e.message === 'pair') pairScreen(T('Ce téléphone a été déconnecté. Entre un nouveau code.', 'This phone was disconnected. Enter a new code.')); else status(T('PC injoignable', 'PC unreachable'), 'off'); };
+
+// ---------- remote ----------
+async function loadState() { try { const s = await call('/api/state'); if (view === 'remote') drawRemote(s); status(T('Connecté à ton PC', 'Connected to your PC'), 'on'); } catch (e) { lost(e); } }
+function drawRemote(s) {
+  const c = s.claude || {}, m = s.music || {}, f = s.focus || {}, body = document.getElementById('body'); if (!body) return;
+  document.getElementById('logo').style.setProperty('--e', COLOURS[c.state] || '#1c1c1e');
+  const ask = c.permission ? `<div class="card"><div class="cap">${I('bell', 14)}${T('Claude demande', 'Claude asks')}</div><div class="title">${esc(c.permission)}</div>${c.permissionDetail ? `<div class="line">${esc(c.permissionDetail)}</div>` : ''}
+      <div class="row"><button class="btn ok" data-a="allow">${I('check', 18)}${T('Autoriser', 'Allow')}</button><button class="btn bad" data-a="deny">${I('x', 18)}${T('Refuser', 'Deny')}</button></div></div>` : '';
+  const MODES = [['normal', 'home', 'Normal', 'Normal'], ['meeting', 'users', 'Réunion', 'Meeting'], ['night', 'moon', 'Nuit', 'Night'], ['stream', 'broadcast', 'Stream', 'Stream']];
+  body.innerHTML = `${ask}
+    <div class="card"><div class="cap">${I('claude', 14)}Claude Code</div><div class="title"><span class="lamp" style="background:${COLOURS[c.state] || '#55555f'}"></span>${esc(STATES[c.state] || T('Rien en cours', 'Nothing running'))}</div>${c.project ? `<div class="line">${esc(c.project)}${c.detail ? ' · ' + esc(c.detail) : ''}</div>` : ''}${c.question ? `<div class="line">${esc(c.question)}</div>` : ''}</div>
+    <div class="card"><div class="cap">${I('music', 14)}${T('Musique', 'Music')}</div><div class="title">${esc(m.title || T('Rien ne joue', 'Nothing playing'))}</div>${m.artist ? `<div class="line">${esc(m.artist)}</div>` : ''}
+      <div class="row"><button class="btn" data-a="previous" aria-label="${T('Précédent', 'Previous')}">${I('prev')}</button><button class="btn main" data-a="${m.playing ? 'pause' : 'play'}" aria-label="${m.playing ? 'Pause' : T('Lecture', 'Play')}">${I(m.playing ? 'pause' : 'play')}</button><button class="btn" data-a="next" aria-label="${T('Suivant', 'Next')}">${I('next')}</button></div></div>
+    <div class="card"><div class="row" style="margin-top:0"><button class="btn ${f.active ? 'on' : ''}" data-a="focus">${I('focus', 18)}${f.active ? esc(f.label) : 'Focus'}</button><button class="btn ${s.micMuted ? 'on' : ''}" data-a="mic">${I(s.micMuted ? 'mic-off' : 'mic', 18)}${s.micMuted ? T('Micro coupé', 'Mic off') : T('Micro', 'Mic')}</button></div></div>
+    <div class="card"><div class="cap">${I('layers', 14)}${T('Mode', 'Mode')}</div><div class="chips">${MODES.map(([id, icon, a, b]) => `<button class="chip ${s.mode === id ? 'on' : ''}" data-a="mode" data-v="${id}">${I(icon, 20)}${T(a, b)}</button>`).join('')}</div></div>`;
   last = s;
 }
-document.addEventListener('click', e => { const b = e.target.closest('[data-a]'); if (!b) return; const a = b.dataset.a; act(a, a === 'allow' || a === 'deny' ? { sessionId: last?.claude?.sessionId } : {}); if (navigator.vibrate) navigator.vibrate(15); });
-async function load() {
-  if (!KEY) { document.getElementById('app').innerHTML = `<p class="err">${T('Scanne le QR code de la page Téléphone de WinLand.', 'Scan the QR code on WinLand’s Phone page.')}</p>`; return; }
-  try { draw(await call('/api/state')); }
-  catch (e) { document.getElementById('sub').textContent = e.message === 'key' ? T('Code expiré : rescanne le QR code', 'Key changed: scan the QR code again') : T('PC injoignable (même Wi-Fi ? WinLand allumé ?)', 'PC unreachable (same Wi-Fi? WinLand on?)'); }
+
+// ---------- Stream Deck ----------
+async function loadDeck(quiet) {
+  try { const r = await call('/api/deck'), same = JSON.stringify(r.deck) === JSON.stringify(deckData); deckData = r.deck; if (view === 'deck' && (!same || !document.querySelector('.deck'))) drawDeck(); status(T('Connecté à ton PC', 'Connected to your PC'), 'on'); }
+  catch (e) { if (!quiet || e.message === 'pair') lost(e); } // disconnected from the PC: always back to the code
 }
-load(); setInterval(load, 2000);
+const isLight = hex => { const n = parseInt(String(hex || '#000').slice(1), 16); return ((n >> 16) * 299 + ((n >> 8) & 255) * 587 + (n & 255) * 114) / 1000 > 170; };
+function drawDeck() {
+  const body = document.getElementById('body'); if (!body || !deckData) return;
+  const d = deckData; deckPage = Math.min(deckPage, d.pages.length - 1); const p = d.pages[deckPage];
+  const tabs = d.pages.length > 1 ? `<div class="pages">${d.pages.map((x, i) => `<button data-page="${i}" class="${i === deckPage ? 'on' : ''}">${esc(x.name)}</button>`).join('')}</div>` : '';
+  const keys = p.buttons.map((k, i) => k ? `<button class="key ${isLight(k.colour) ? 'light' : ''}" style="--c:${esc(k.colour)}" data-key="${i}" ${k.go != null ? `data-go="${k.go}"` : ''}>${I(k.icon, 28)}<span>${esc(k.label)}</span></button>` : `<div class="key empty"></div>`).join('');
+  body.innerHTML = `${tabs}<div class="deck" style="grid-template-columns:repeat(${d.cols},1fr)">${keys}</div>${p.buttons.some(Boolean) ? '' : `<div class="empty-note">${T('Cette page est vide : crée tes boutons dans WinLand (page Téléphone, Stream Deck).', 'This page is empty: make your buttons in WinLand (Phone page, Stream Deck).')}</div>`}`;
+}
+async function press(button) {
+  if (button.dataset.go != null) { deckPage = Number(button.dataset.go) || 0; drawDeck(); return; }
+  if (navigator.vibrate) navigator.vibrate(12);
+  try { const r = await call('/api/press', { page: deckPage, index: Number(button.dataset.key) }); button.classList.add(r.ok ? 'done' : 'fail'); setTimeout(() => button.classList.remove('done', 'fail'), 350); }
+  catch (e) { lost(e); }
+}
+
+// ---------- taps ----------
+document.addEventListener('click', async e => {
+  const t = e.target.closest('button'); if (!t) return;
+  if (t.dataset.view) return show(t.dataset.view);
+  if (t.dataset.page != null) { deckPage = Number(t.dataset.page); return drawDeck(); }
+  if (t.dataset.key != null) return press(t);
+  if (t.dataset.forget) { try { await call('/api/forget', {}); } catch {} TOKEN = ''; store.set('winland-token', ''); return pairScreen(''); }
+  if (t.dataset.a) {
+    const a = t.dataset.a; if (navigator.vibrate) navigator.vibrate(12);
+    try { await call('/api/do', { kind: a, value: t.dataset.v || '', sessionId: a === 'allow' || a === 'deny' ? last?.claude?.sessionId : '' }); setTimeout(loadState, 400); } catch (err) { lost(err); }
+  }
+});
+document.addEventListener('visibilitychange', () => { if (!document.hidden && TOKEN) show(view); });
+if (TOKEN) show(view); else pairScreen('');
 </script>
 </body></html>

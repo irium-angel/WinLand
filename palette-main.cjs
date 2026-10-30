@@ -53,7 +53,10 @@ ipcMain.handle('palette:index', e => {
 ipcMain.handle('palette:open', async (e, req) => {
   if (!fromIsland(e)) return null;
   const list = build()[req?.kind], item = list?.[Number(req?.id)]; if (!item) return { ok: false };
-  if (req.kind === 'scripts') { // run it, in its own window for .ps1/.cmd so you see what it does
+  return openItem(req.kind, item, req);
+});
+async function openItem(kind, item, req) {
+  if (kind === 'scripts') { // run it, in its own window for .ps1/.cmd so you see what it does
     const p = item.path, ext = path.extname(p).toLowerCase();
     if (ext === '.ps1') spawn('cmd.exe', ['/c', 'start', '""', 'powershell', '-NoExit', '-ExecutionPolicy', 'Bypass', '-File', p], { cwd: path.dirname(p), detached: true, stdio: 'ignore', windowsHide: true }).unref();
     else if (ext === '.js') spawn('cmd.exe', ['/c', 'start', '""', 'cmd', '/k', 'bun', p], { cwd: path.dirname(p), detached: true, stdio: 'ignore', windowsHide: true }).unref();
@@ -61,12 +64,20 @@ ipcMain.handle('palette:open', async (e, req) => {
     else spawn('cmd.exe', ['/c', 'start', '""', 'cmd', '/k', p], { cwd: path.dirname(p), detached: true, stdio: 'ignore', windowsHide: true }).unref();
     return { ok: true };
   }
-  if (req.kind === 'projects') { // VS Code when it is there, else the folder
+  if (kind === 'projects') { // VS Code when it is there, else the folder
     const code = [path.join(process.env.LOCALAPPDATA || '', 'Programs', 'Microsoft VS Code', 'Code.exe'), path.join(process.env.ProgramFiles || '', 'Microsoft VS Code', 'Code.exe')].find(p => fs.existsSync(p));
     if (code && req.with !== 'folder') { spawn(code, [item.path], { detached: true, stdio: 'ignore' }).unref(); return { ok: true }; }
   }
   const problem = await shell.openPath(item.path); return { ok: !problem, error: problem };
-});
+}
+// for the Stream Deck (remote-main.cjs): the lists, and opening one by its name
+app.winlandLaunch = {
+  lists: () => { const i = build(true); return { apps: i.apps.map(a => a.name), scripts: i.scripts.map(s => s.name), projects: i.projects.map(p => ({ name: p.name, path: p.path })) }; },
+  open: (kind, name) => {
+    const list = build()[kind] || [], item = list.find(x => x.name === name) || list.find(x => x.name.toLowerCase() === String(name).toLowerCase());
+    return item ? openItem(kind, item, {}) : { ok: false, error: 'missing' };
+  }
+};
 ipcMain.handle('palette:scripts-folder', async e => { if (!fromIsland(e)) return null; build(); await shell.openPath(scriptsDir()); return { ok: true }; });
 
 // ---------- a task for Claude Code, in a terminal, in the project's folder ----------

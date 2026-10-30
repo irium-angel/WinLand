@@ -182,7 +182,7 @@
     const i = pageIndex(), by = H - 19;
     // bottom right: the speaker; point at it and it slides open into a volume slider
     const sys = window.__winlandSysVolume || { level: 50, muted: false }, level = sys.muted ? 0 : sys.level / 100;
-    const volZone = { x: right - 132, y: by - 15, width: 124, height: 30 };
+    const volZone = { x: right - 124, y: by - 15, width: 116, height: 30 }; // right of the tabs (they end at right - 128)
     nav.vol += ((nav.sliding || inside(pointer.x, pointer.y, nav.vol > 0.5 ? volZone : { x: right - 40, y: by - 15, width: 32, height: 30 }) ? 1 : 0) - nav.vol) * 0.25;
     icon('speaker', right - 25, by, 16, nav.vol > 0.1 ? '#ffffff' : '#8e8e93', level, 'rgba(0,0,0,0)');
     hit.navVol = null;
@@ -195,12 +195,15 @@
     // bottom middle: the pages as icons, always visible; the page you are on shows its name in a soft capsule in its colour
     const n = pages().length, label = pg => en() ? pg.en : pg.nl;
     ctx.save(); ctx.font = '600 11px Inter, "Segoe UI", sans-serif';
-    const extra = i >= 0 ? ctx.measureText(label(pages()[i])).width + 10 : 0, room = right - left - 150; // the volume on the right, a margin on the left
-    const unit = Math.max(20, Math.min(30, Math.floor((room - extra - (n - 1) * 2) / Math.max(1, n))));
+    // the tabs stay left of the volume slider (it opens leftwards from the speaker): before, it covered the last tabs
+    const start = left + 18, end = right - 128, room = end - start, fit = extra => Math.floor((room - extra - (n - 1) * 2) / Math.max(1, n));
+    let extra = i >= 0 ? ctx.measureText(label(pages()[i])).width + 10 : 0;
+    if (fit(extra) < 20) extra = 0; // many tabs: the page you are on keeps its colour, not its name
+    const unit = Math.max(16, Math.min(30, fit(extra)));
     const want = pages().map((pg, j) => unit + (j === i ? extra : 0)); ctx.restore();
     if (!nav.widths || nav.widths.length !== n) nav.widths = want.slice();
     nav.widths = nav.widths.map((w, j) => w + (want[j] - w) * 0.25); // the capsule glides to the new page
-    const rowW = nav.widths.reduce((sum, w) => sum + w, 0) + (n - 1) * 2, cx = (left + right) / 2 - 10;
+    const rowW = nav.widths.reduce((sum, w) => sum + w, 0) + (n - 1) * 2, cx = (start + end) / 2;
     let x = cx - rowW / 2, tipAt = null;
     pages().forEach((pg, j) => {
       const w = nav.widths[j], b = { x, y: by - 14, width: w, height: 28 }, over = inside(pointer.x, pointer.y, b), on = j === i;

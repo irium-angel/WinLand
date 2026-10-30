@@ -504,6 +504,53 @@ namespace WinLand {
   }
 
   // ---------- Windows notifications (Discord, Outlook, Teams…): each new one, once ----------
+  // ---------- keyboard (Stream Deck on the phone): a shortcut like ctrl+shift+m, a media key, or text typed out ----------
+  static class Keys {
+    [StructLayout(LayoutKind.Sequential)] struct KEYBDINPUT { public ushort wVk; public ushort wScan; public uint dwFlags; public uint time; public IntPtr dwExtraInfo; }
+    [StructLayout(LayoutKind.Sequential)] struct MOUSEINPUT { public int dx; public int dy; public uint mouseData; public uint dwFlags; public uint time; public IntPtr dwExtraInfo; }
+    [StructLayout(LayoutKind.Explicit)] struct UNION { [FieldOffset(0)] public KEYBDINPUT ki; [FieldOffset(0)] public MOUSEINPUT mi; }
+    [StructLayout(LayoutKind.Sequential)] struct INPUT { public uint type; public UNION u; }
+    [DllImport("user32.dll", SetLastError = true)] static extern uint SendInput(uint n, INPUT[] inputs, int size);
+    const uint KEYUP = 2, UNICODE = 4, EXTENDED = 1;
+    static readonly System.Collections.Generic.Dictionary<string, ushort> NAMES = new System.Collections.Generic.Dictionary<string, ushort>(StringComparer.OrdinalIgnoreCase) {
+      { "ctrl", 0x11 }, { "control", 0x11 }, { "shift", 0x10 }, { "alt", 0x12 }, { "win", 0x5B }, { "windows", 0x5B },
+      { "enter", 0x0D }, { "return", 0x0D }, { "esc", 0x1B }, { "escape", 0x1B }, { "tab", 0x09 }, { "space", 0x20 }, { "backspace", 0x08 },
+      { "delete", 0x2E }, { "del", 0x2E }, { "insert", 0x2D }, { "home", 0x24 }, { "end", 0x23 }, { "pageup", 0x21 }, { "pagedown", 0x22 },
+      { "left", 0x25 }, { "up", 0x26 }, { "right", 0x27 }, { "down", 0x28 }, { "printscreen", 0x2C }, { "capslock", 0x14 },
+      { "playpause", 0xB3 }, { "nexttrack", 0xB0 }, { "prevtrack", 0xB1 }, { "stop", 0xB2 }, { "volumeup", 0xAF }, { "volumedown", 0xAE }, { "volumemute", 0xAD },
+      { "plus", 0xBB }, { "minus", 0xBD }, { "comma", 0xBC }, { "period", 0xBE }
+    };
+    static readonly ushort[] EXTENDED_KEYS = { 0x2E, 0x2D, 0x24, 0x23, 0x21, 0x22, 0x25, 0x26, 0x27, 0x28, 0x5B, 0xB3, 0xB0, 0xB1, 0xB2, 0xAF, 0xAE, 0xAD };
+    static INPUT Key(ushort vk, bool up) {
+      var i = new INPUT { type = 1 }; i.u.ki.wVk = vk;
+      i.u.ki.dwFlags = (up ? KEYUP : 0) | (Array.IndexOf(EXTENDED_KEYS, vk) >= 0 ? EXTENDED : 0); return i;
+    }
+    static ushort Vk(string name) {
+      ushort vk; if (NAMES.TryGetValue(name, out vk)) return vk;
+      if (name.Length == 1) { char c = char.ToUpperInvariant(name[0]); if ((c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')) return c; }
+      int f; if (name.Length >= 2 && (name[0] == 'f' || name[0] == 'F') && int.TryParse(name.Substring(1), out f) && f >= 1 && f <= 24) return (ushort)(0x70 + f - 1);
+      throw new Exception("unknown key " + name);
+    }
+    // "ctrl+shift+m": press them in order, let go in the opposite order
+    public static void Press(string spec) {
+      var parts = spec.Split('+'); var vks = new ushort[parts.Length];
+      for (int k = 0; k < parts.Length; k++) vks[k] = Vk(parts[k].Trim());
+      var list = new System.Collections.Generic.List<INPUT>();
+      foreach (var v in vks) list.Add(Key(v, false));
+      for (int k = vks.Length - 1; k >= 0; k--) list.Add(Key(vks[k], true));
+      SendInput((uint)list.Count, list.ToArray(), Marshal.SizeOf(typeof(INPUT)));
+    }
+    // any text, letter by letter (accents and emoji too), a new line is Enter
+    public static void Type(string text) {
+      var list = new System.Collections.Generic.List<INPUT>();
+      foreach (char c in text.Replace("\r\n", "\n")) {
+        if (c == '\n') { list.Add(Key(0x0D, false)); list.Add(Key(0x0D, true)); continue; }
+        foreach (bool up in new[] { false, true }) { var i = new INPUT { type = 1 }; i.u.ki.wScan = c; i.u.ki.dwFlags = UNICODE | (up ? KEYUP : 0); list.Add(i); }
+      }
+      if (list.Count > 0) SendInput((uint)list.Count, list.ToArray(), Marshal.SizeOf(typeof(INPUT)));
+    }
+  }
+
   static class Notify {
     public static void Run() {
       var thread = new Thread(() => {
@@ -545,6 +592,8 @@ namespace WinLand {
             else if (parts.Length == 2 && parts[0] == "output") { Outputs.Use(parts[1]); Program.Say("outputs " + Outputs.List()); }
             else if (parts.Length == 2 && parts[0] == "micmute") { Audio.MicMute(parts[1] == "1"); Program.Say("micmute " + Audio.MicMuted()); }
             else if (parts[0] == "pixel") Program.Say("pixel " + Tools.Pixel());
+            else if (parts.Length == 2 && parts[0] == "keys") Keys.Press(parts[1]); // Stream Deck
+            else if (parts.Length == 2 && parts[0] == "type") Keys.Type(Encoding.UTF8.GetString(Convert.FromBase64String(parts[1])));
             else if (parts.Length == 2 && parts[0] == "rect") Program.Say("rect " + Tools.FrontRect(int.Parse(parts[1])));
             else if (parts[0] == "agenda") { string a; try { a = Tools.Agenda(); } catch { a = "[]"; } Program.Say("agenda " + a); }
             else if (parts.Length == 2 && parts[0] == "ocr") { string r; try { r = Tools.Ocr(Encoding.UTF8.GetString(Convert.FromBase64String(parts[1]))); } catch (Exception e) { r = "{\"ok\":false,\"error\":" + J.S(e.Message) + "}"; } Program.Say("ocr " + r); }

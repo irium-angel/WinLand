@@ -50,13 +50,14 @@ async function next() {
   });
 }
 ipcMain.handle('queue:get', e => fromIsland(e) ? view() : null);
-ipcMain.handle('queue:add', (e, req) => {
-  if (!fromIsland(e)) return null;
-  const prompt = String(req?.prompt || '').trim().slice(0, 4000), project = String(req?.project || '');
+function add(prompt, project) {
+  prompt = String(prompt || '').trim().slice(0, 4000); project = String(project || '');
   if (!prompt || !path.isAbsolute(project) || !fs.existsSync(project)) return { ok: false, error: 'project' };
   queue.push({ id: Date.now() + '-' + Math.random().toString(36).slice(2, 6), prompt, project, state: 'queued', at: Date.now() });
   tell(); next(); return view();
-});
+}
+ipcMain.handle('queue:add', (e, req) => fromIsland(e) ? add(req?.prompt, req?.project) : null);
+app.winlandQueueAdd = add; // a Stream Deck button (deck-main.cjs)
 ipcMain.handle('queue:remove', (e, req) => {
   if (!fromIsland(e)) return null;
   const t = queue.find(x => x.id === req?.id); if (!t) return view();

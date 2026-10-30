@@ -161,8 +161,8 @@
   .chk i svg{width:10px;height:10px;stroke:#fff;fill:none;stroke-width:3;stroke-linecap:round;stroke-linejoin:round;opacity:0;transform:scale(.4);transition:opacity .25s,transform .35s cubic-bezier(.3,1.6,.5,1)}
   .chk.now{color:var(--text)}.chk.now i{border-color:var(--text)}
   .chk.ok{color:var(--text)}.chk.ok i{background:var(--good);border-color:var(--good)}.chk.ok i svg{opacity:1;transform:none}
-  .err{margin-top:16px;padding:12px 14px;border-radius:12px;background:rgba(255,69,58,.12);color:#ff6961;font-size:12.5px;display:none}
-  .err.on{display:block}
+  .err{margin-top:12px;padding:10px 14px;border-radius:12px;background:rgba(255,69,58,.12);color:#ff6961;font-size:12.5px;display:none;overflow:hidden;-webkit-box-orient:vertical;-webkit-line-clamp:3;word-break:break-word}
+  .err.on{display:-webkit-box} /* 3 lines at most: the Try again button below always stays in the window */
   canvas#confetti{position:absolute;inset:0;pointer-events:none;z-index:4}
 </style></head>
 <body>
@@ -294,7 +294,8 @@ const WORDS = {
     keep: 'Garder mes réglages', keepHelp: 'Pratique si tu réinstalles WinLand plus tard', cancel: 'Annuler', uninstall: 'Désinstaller',
     goneKicker: 'C’est fait', goneTitle: 'À <em>bientôt</em> !', goneLead: 'WinLand a été désinstallé. Merci d’avoir passé du temps avec Pip.',
     say: { welcome: 'Salut !', options: 'Fais-toi plaisir', work: 'Je m’en occupe…', done: 'Trop bien !', bye: 'Oh non…', gone: 'Bye bye' },
-    error: 'Quelque chose a coincé :'
+    error: 'Quelque chose a coincé :',
+    locked: 'Un fichier de WinLand est encore utilisé (WinLand qui se ferme, ou ton antivirus qui le vérifie). Attends quelques secondes, ou ferme WinLand près de l’horloge, puis clique sur Réessayer.'
   },
   en: {
     kicker: 'Setup', welcome: 'Welcome to <em>WinLand</em>', welcomeLead: 'Your Dynamic Island for Windows, with Pip. It lives at the top of your screen and stays 100 % on your PC.',
@@ -315,7 +316,8 @@ const WORDS = {
     keep: 'Keep my settings', keepHelp: 'Handy if you install WinLand again later', cancel: 'Cancel', uninstall: 'Uninstall',
     goneKicker: 'Done', goneTitle: 'See you <em>soon</em>!', goneLead: 'WinLand has been uninstalled. Thanks for spending time with Pip.',
     say: { welcome: 'Hi there!', options: 'Make it yours', work: 'On it…', done: 'Awesome!', bye: 'Oh no…', gone: 'Bye bye' },
-    error: 'Something got stuck:'
+    error: 'Something got stuck:',
+    locked: 'A WinLand file is still in use (WinLand closing, or your antivirus checking it). Wait a few seconds, or close WinLand near the clock, then click Try again.'
   }
 };
 const PROFILES = [
@@ -392,7 +394,7 @@ async function work() {
   await new Promise(res => setTimeout(res, Math.max(0, 1600 - (Date.now() - started)))); // long enough to see Pip work
   working = false; $('#close').disabled = false;
   if (r?.ok) { target = 100; $('#fill').style.width = '100%'; checks('done'); setTimeout(() => go(MODE === 'uninstall' ? 'gone' : 'done'), 650); return; }
-  $('#err').textContent = w().error + ' ' + (r?.error || '?'); $('#err').classList.add('on'); $('#retry').hidden = false;
+  $('#err').textContent = r?.code === 'locked' ? w().locked : w().error + ' ' + (r?.error || '?'); $('#err').title = r?.error || ''; $('#err').classList.add('on'); $('#retry').hidden = false;
   document.body.className = ''; say('…');
 }
 

@@ -22,7 +22,7 @@
 | **Live** | Le texte de tes captures copié tout seul, l'agenda Windows du jour, plusieurs minuteurs et rappels, presse-papiers intelligent, modes Réunion / Nuit / Streaming |
 | **Automatisations** | Des règles « quand X, alors Y » : un jeu se lance, un casque se branche, Claude a fini pendant ton absence, il est 23 h… |
 | **Tableau de bord Claude** | Toutes tes sessions, ta consommation, et une file de tâches que Claude Code fait l'une après l'autre |
-| **Téléphone** | Ton téléphone comme télécommande sur ton Wi-Fi (QR code) : voir et autoriser Claude, musique, focus, micro |
+| **Téléphone** | Ton téléphone comme télécommande sur ton Wi-Fi : scanne le QR code, tape le code à 6 chiffres affiché par WinLand. Claude, musique, focus, micro, modes, ou mode **Stream Deck** : tes propres boutons (apps, liens, dossiers, scripts, raccourcis clavier, texte, volume, minuteurs, tâches Claude…), créés dans l'éditeur sur le PC |
 | **Par profil** | Logiciels installés, pipette et ports (Développement), accordeur, BPM et notes vocales (Studio) |
 | **À ton goût** | Français ou anglais, thème sombre ou clair, démarrage avec Windows (activable/désactivable) |
 

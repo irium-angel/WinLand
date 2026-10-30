@@ -71,6 +71,9 @@ function setup(electron) {
   });
   app.winlandFrontRect = async skipPid => { const r = await ask('rect', 'rect ' + (Number(skipPid) || 0), 1500); const n = String(r || '-').split(' ').map(Number); return n.length === 4 && n.every(Number.isFinite) ? { x: n[0], y: n[1], width: n[2], height: n[3] } : null; }; // Pip on the desktop
   const setMic = on => { volumeChild?.stdin?.write('micmute ' + (on ? '1' : '0') + '\n'); };
+  // for the Stream Deck (remote-main.cjs): a line for the helper (keys, type, set, mute, micmute) and the volume now
+  app.winlandHelper = line => { if (!volumeChild?.stdin || /[\r\n]/.test(line)) return false; volumeChild.stdin.write(line + '\n'); return true; };
+  app.winlandVolumeNow = () => volumeNow;
   handle('extras:mic-get', async () => ({ muted: micMuted, notifications: notifAccess }));
   handle('extras:mic-set', async payload => { setMic(Boolean(payload?.muted)); return {}; });
   handle('extras:idle', async () => ({ seconds: electron.powerMonitor.getSystemIdleTime() })); // how long nobody touched the PC (automations)
